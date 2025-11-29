@@ -1,6 +1,6 @@
 [package]
 name = "libsql-orm"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Ayon Saha <ayonsaha2011@gmail.com>"]
 description = "A powerful, async-first ORM for libsql with first-class support for Cloudflare Workers and WebAssembly environments. Features include automatic boolean conversion, upsert operations, built-in logging, migrations, and comprehensive query building."
@@ -24,14 +24,14 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-libsql = { version = "0.9.14", default-features = false }
+libsql = { version = "0.9", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde", "js"] }
-libsql-orm-macros = { version = "0.1.1", path = "./libsql-orm-macros" }
+libsql-orm-macros = { version = "0.1", path = "./libsql-orm-macros" }
 anyhow = "1.0"
-worker = { version = "0.6", optional = true }
+worker = { version = "=0.7.0", optional = true }
 web-sys = { version = "0.3", features = ["console"], optional = true }
 log = "0.4"
 
@@ -53,3 +53,15 @@ crate-type = ["cdylib", "rlib"]
 [workspace]
 members = [".", "libsql-orm-macros"]
 resolver = "2"
+
+[workspace.dependencies]
+worker = "=0.7.0"
+
+# Patch libsql to use git version which should be more flexible with worker versions
+[patch.crates-io]
+libsql = { git = "https://github.com/tursodatabase/libsql", version = "0.9.29" }
+
+
+
+
+

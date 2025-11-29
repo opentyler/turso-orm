@@ -28,3 +28,4 @@ build/
 *.db
 *.sqlite
 *.sqlite3 
+/.claude/settings.local.json
