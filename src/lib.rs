@@ -1,6 +1,6 @@
-//! # libsql-orm
+//! # turso-orm
 //!
-//! A powerful, async-first ORM for [libsql](https://github.com/libsql/libsql) with first-class support for **Cloudflare Workers** and WebAssembly environments.
+//! A powerful, async-first ORM for [Turso Database](https://github.com/tursodatabase) with first-class support for **Cloudflare Workers** and WebAssembly environments.
 //!
 //! ## ✨ Features
 //!
@@ -36,7 +36,7 @@
 //!
 //! async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Connect to database
-//!     let db = Database::new_connect("libsql://your-db.turso.io", "your-auth-token").await?;
+//!     let db = Database::new_connect("turso://your-db.turso.io", "your-auth-token").await?;
 //!     
 //!     // Create a user
 //!     let user = User {
@@ -181,8 +181,8 @@
 //!
 //! #[event(fetch)]
 //! async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
-//!     let database_url = env.var("LIBSQL_DATABASE_URL")?.to_string();
-//!     let auth_token = env.var("LIBSQL_AUTH_TOKEN")?.to_string();
+//!     let database_url = env.var("TURSO_DATABASE_URL")?.to_string();
+//!     let auth_token = env.var("TURSO_AUTH_TOKEN")?.to_string();
 //!     
 //!     let db = Database::new_connect(&database_url, &auth_token).await
 //!         .map_err(|e| format!("Database connection failed: {}", e))?;

@@ -1,6 +1,6 @@
 //! Database connection and query execution
 //!
-//! This module handles the connection to libsql databases and provides
+//! This module handles the connection to Turso databases and provides
 //! query execution capabilities for Cloudflare Workers.
 
 #[cfg(target_arch = "wasm32")]
@@ -8,10 +8,10 @@ use libsql::wasm::{CloudflareSender, Connection, Rows};
 #[cfg(not(target_arch = "wasm32"))]
 use libsql::{Builder, Connection, Rows};
 
-/// Database connection wrapper for libsql in Cloudflare Workers
+/// Database connection wrapper for Turso in Cloudflare Workers
 ///
 /// Provides a high-level interface for connecting to and interacting with
-/// libsql databases in WebAssembly environments, specifically optimized
+/// Turso databases in WebAssembly environments, specifically optimized
 /// for Cloudflare Workers.
 ///
 /// # Examples
@@ -49,11 +49,11 @@ impl From<Connection> for Database {
 }
 
 impl Database {
-    /// Creates a new database connection to a libsql database
+    /// Creates a new database connection to a Turso database
     ///
     /// # Arguments
     ///
-    /// * `url` - The database URL (e.g., "libsql://your-db.turso.io")
+    /// * `url` - The database URL (e.g., "turso://your-db.turso.io")
     /// * `token` - The authentication token for the database
     ///
     /// # Returns
@@ -67,7 +67,7 @@ impl Database {
     ///
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     let db = Database::new_connect(
-    ///         "libsql://your-db.turso.io",
+    ///         "turso://your-db.turso.io",
     ///         "your-auth-token"
     ///     ).await?;
     ///     println!("Connected to database successfully!");

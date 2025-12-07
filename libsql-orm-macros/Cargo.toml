@@ -3,13 +3,13 @@ name = "libsql-orm-macros"
 version = "0.1.1"
 edition = "2021"
 authors = ["Ayon Saha <ayonsaha2011@gmail.com>"]
-description = "Procedural macros for libsql-orm - automatic Model trait implementation and ORM functionality"
+description = "Procedural macros for turso-orm - automatic Model trait implementation and ORM functionality"
 documentation = "https://docs.rs/libsql-orm-macros"
 homepage = "https://github.com/ayonsaha2011/libsql-orm"
 repository = "https://github.com/ayonsaha2011/libsql-orm"
 license = "MIT"
 readme = "../README.md"
-keywords = ["orm", "libsql", "macros", "derive", "database"]
+keywords = ["orm", "turso", "macros", "derive", "database"]
 categories = ["database", "web-programming", "development-tools::procedural-macro-helpers"]
 
 [package.metadata.docs.rs]

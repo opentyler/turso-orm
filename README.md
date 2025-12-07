@@ -1,11 +1,11 @@
-# libsql-orm
+# turso-orm
 
 [![Crates.io](https://img.shields.io/crates/v/libsql-orm.svg)](https://crates.io/crates/libsql-orm)
 [![Documentation](https://docs.rs/libsql-orm/badge.svg)](https://docs.rs/libsql-orm)
 [![License](https://img.shields.io/crates/l/libsql-orm.svg)](LICENSE)
 [![Build Status](https://github.com/ayonsaha2011/libsql-orm/workflows/CI/badge.svg)](https://github.com/ayonsaha2011/libsql-orm/actions)
 
-A powerful, async-first ORM for [libsql](https://github.com/libsql/libsql) with first-class support for **Cloudflare Workers** and WebAssembly environments.
+A powerful, async-first ORM for [Turso Database](https://github.com/tursodatabase) with first-class support for **Cloudflare Workers** and WebAssembly environments.
 
 > ⚠️ **Disclaimer**: This library is in early development and not fully tested in production environments. Use at your own risk. Please report any issues you encounter and feel free to contribute via pull requests - we're happy to address them and welcome community contributions!
 
@@ -57,7 +57,7 @@ struct User {
 // In your async function
 async fn example() -> Result<(), Box<dyn std::error::Error>> {
     // Connect to database
-    let db = Database::new_connect("libsql://your-db.turso.io", "your-auth-token").await?;
+    let db = Database::new_connect("turso://your-db.turso.io", "your-auth-token").await?;
     
     // Create a user
     let user = User {
@@ -107,8 +107,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     console_error_panic_hook::set_once();
     
     // Get database credentials from environment
-    let database_url = env.var("LIBSQL_DATABASE_URL")?.to_string();
-    let auth_token = env.var("LIBSQL_AUTH_TOKEN")?.to_string();
+    let database_url = env.var("TURSO_DATABASE_URL")?.to_string();
+    let auth_token = env.var("TURSO_AUTH_TOKEN")?.to_string();
     
     // Connect to database
     let db = Database::new_connect(&database_url, &auth_token).await
@@ -160,7 +160,7 @@ assert_eq!(User::table_name(), "user_accounts");
 
 ### Boolean Type Safety
 
-libsql-orm automatically handles boolean conversion between SQLite and Rust:
+turso-orm automatically handles boolean conversion between SQLite and Rust:
 
 ```rust
 use libsql_orm::{Model, FilterOperator, Value};
@@ -343,7 +343,7 @@ let saved_user = user.upsert(&["email", "username"], &db).await?;
 
 ### WASM Compatibility
 
-libsql-orm is built from the ground up for WebAssembly environments:
+turso-orm is built from the ground up for WebAssembly environments:
 
 - Uses `libsql` WASM bindings for database connectivity
 - Optimized async runtime for edge computing
@@ -353,10 +353,10 @@ libsql-orm is built from the ground up for WebAssembly environments:
 
 ## 🔗 Ecosystem
 
-libsql-orm works great with:
+turso-orm works great with:
 
-- **[libsql](https://github.com/libsql/libsql)** - The database engine
-- **[Turso](https://turso.tech/)** - Managed libsql hosting
+- **[Turso Database](https://github.com/tursodatabase)** - The database platform
+- **[Turso](https://turso.tech/)** - Managed Turso hosting
 - **[Cloudflare Workers](https://workers.cloudflare.com/)** - Edge computing platform
 - **[worker-rs](https://github.com/cloudflare/workers-rs)** - Cloudflare Workers Rust SDK
 
@@ -390,7 +390,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [libsql team](https://github.com/libsql/libsql) for the excellent database engine
+- [Turso team](https://github.com/tursodatabase) for the excellent database platform
 - [Cloudflare](https://cloudflare.com) for the Workers platform
 - Rust community for the amazing ecosystem
 
