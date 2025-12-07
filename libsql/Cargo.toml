@@ -1,6 +1,6 @@
 [package]
 name = "libsql"
-version = "0.9.29"
+version = "1.9.0"
 authors = ["the libSQL authors"]
 edition = "2021"
 license = "MIT"
