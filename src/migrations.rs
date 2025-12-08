@@ -56,7 +56,11 @@
 //! let create_index = templates::create_index("idx_posts_title", "posts", &["title"]);
 //! ```
 
-use crate::{database::Database, error::Error, compat::{null_value, text_value}};
+use crate::{
+    compat::{null_value, text_value},
+    database::Database,
+    error::Error,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -159,45 +163,42 @@ impl MigrationManager {
         {
             let sql =
                 "SELECT id, name, sql, created_at, executed_at FROM migrations ORDER BY created_at";
-            let mut rows = self
-                .db
-                .query(sql, vec![null_value(); 0])
-                .await?;
+            let mut rows = self.db.query(sql, vec![null_value(); 0]).await?;
 
-        let mut migrations = Vec::new();
-        while let Some(row) = rows.next().await? {
-            let migration = Migration {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                sql: row.get(2)?,
-                created_at: DateTime::parse_from_rfc3339(&row.get::<String>(3).unwrap_or_default())
+            let mut migrations = Vec::new();
+            while let Some(row) = rows.next().await? {
+                let migration = Migration {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    sql: row.get(2)?,
+                    created_at: DateTime::parse_from_rfc3339(
+                        &row.get::<String>(3).unwrap_or_default(),
+                    )
                     .map_err(|_| Error::DatabaseError("Invalid datetime format".to_string()))?
                     .with_timezone(&Utc),
-                executed_at: row
-                    .get::<Option<String>>(4)
-                    .unwrap_or(None)
-                    .map(|dt| {
-                        DateTime::parse_from_rfc3339(&dt)
-                            .map_err(|_| {
-                                Error::DatabaseError("Invalid datetime format".to_string())
-                            })
-                            .map(|dt| dt.with_timezone(&Utc))
-                    })
-                    .transpose()?,
-            };
-            migrations.push(migration);
-        }
+                    executed_at: row
+                        .get::<Option<String>>(4)
+                        .unwrap_or(None)
+                        .map(|dt| {
+                            DateTime::parse_from_rfc3339(&dt)
+                                .map_err(|_| {
+                                    Error::DatabaseError("Invalid datetime format".to_string())
+                                })
+                                .map(|dt| dt.with_timezone(&Utc))
+                        })
+                        .transpose()?,
+                };
+                migrations.push(migration);
+            }
 
-        Ok(migrations)
+            Ok(migrations)
         }
     }
 
     /// Execute a migration
     pub async fn execute_migration(&self, migration: &Migration) -> Result<(), Error> {
         // Begin transaction
-        self.db
-            .execute("BEGIN", vec![null_value(); 0])
-            .await?;
+        self.db.execute("BEGIN", vec![null_value(); 0]).await?;
 
         // Execute the migration SQL
         self.db
@@ -224,9 +225,7 @@ impl MigrationManager {
             .await?;
 
         // Commit transaction
-        self.db
-            .execute("COMMIT", vec![null_value(); 0])
-            .await?;
+        self.db.execute("COMMIT", vec![null_value(); 0]).await?;
 
         Ok(())
     }

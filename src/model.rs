@@ -452,7 +452,10 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
             placeholders.join(", ")
         );
 
-        let params: Vec<crate::compat::LibsqlValue> = ids.iter().map(|&id| crate::compat::integer_value(id)).collect();
+        let params: Vec<crate::compat::LibsqlValue> = ids
+            .iter()
+            .map(|&id| crate::compat::integer_value(id))
+            .collect();
         db.execute(&sql, params).await?;
         Ok(ids.len() as u64)
     }

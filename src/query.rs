@@ -567,7 +567,10 @@ impl QueryBuilder {
     }
 
     /// Build individual filter
-    fn build_filter(&self, filter: &crate::Filter) -> Result<(String, Vec<crate::compat::LibsqlValue>)> {
+    fn build_filter(
+        &self,
+        filter: &crate::Filter,
+    ) -> Result<(String, Vec<crate::compat::LibsqlValue>)> {
         let mut sql = String::new();
         let mut params = Vec::new();
 
@@ -689,7 +692,9 @@ impl QueryBuilder {
     fn libsql_value_to_json_value(&self, value: &crate::compat::LibsqlValue) -> serde_json::Value {
         match value {
             crate::compat::LibsqlValue::Null => serde_json::Value::Null,
-            crate::compat::LibsqlValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+            crate::compat::LibsqlValue::Integer(i) => {
+                serde_json::Value::Number(serde_json::Number::from(*i))
+            }
             crate::compat::LibsqlValue::Real(f) => {
                 if let Some(n) = serde_json::Number::from_f64(*f) {
                     serde_json::Value::Number(n)

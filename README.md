@@ -30,7 +30,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-libsql-orm = { version = "0.2.3", features = ["cloudflare"] }
+libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -104,7 +104,7 @@ First, ensure your `Cargo.toml` includes the necessary features and patches:
 
 ```toml
 [dependencies]
-libsql-orm = { version = "0.2.3", features = ["cloudflare"] }
+libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
 worker = ">=0.7.0"
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -161,6 +161,273 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         _ => Response::error("Method not allowed", 405)
     }
 }
+```
+
+### Advanced Cloudflare Workers with Axum Integration
+
+For more complex applications, you can integrate libsql-orm with Axum for better routing and state management.
+
+**Key Requirements:**
+- 🏗️ **Library crate**: Use `crate-type = ["cdylib"]` for Cloudflare Workers
+- 🔧 **Worker features**: Enable `http` and `axum` features for the worker crate
+- 🎯 **Axum config**: Use `default-features = false` for WASM compatibility
+- 🔗 **Tower service**: Required for Axum routing integration
+
+**Setup:**
+
+```toml
+[package]
+name = "my-cloudflare-app"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
+worker = { version = "0.7", features = ["http", "axum"] }
+worker-macros = { version = "0.7", features = ["http"] }
+axum = { version = "0.8", default-features = false }
+tower-service = "0.3.3"
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Use git version of libsql with newer worker dependency
+[patch.crates-io]
+libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudflare"] }
+```
+
+```rust
+use worker::*;
+use libsql_orm::{Model, Database, FilterOperator, Filter};
+use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
+use axum::{
+    extract::{State, Path, Json},
+    http::StatusCode,
+    response::Json as ResponseJson,
+    routing::{get, post, put, delete},
+    Router,
+};
+use std::sync::Arc;
+
+// Application state
+#[derive(Clone)]
+pub struct AppState {
+    pub db: Arc<Database>,
+}
+
+// User model
+#[derive(Model, Debug, Clone, Serialize, Deserialize)]
+#[table_name("users")]
+struct User {
+    pub id: Option<i64>,
+    pub name: String,
+    pub email: String,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+// Request/Response DTOs
+#[derive(Deserialize)]
+struct CreateUserRequest {
+    pub name: String,
+    pub email: String,
+}
+
+#[derive(Serialize)]
+struct ApiResponse<T> {
+    pub success: bool,
+    pub data: Option<T>,
+    pub error: Option<String>,
+}
+
+impl<T> ApiResponse<T> {
+    fn success(data: T) -> Self {
+        Self { success: true, data: Some(data), error: None }
+    }
+
+    fn error(error: String) -> Self {
+        Self { success: false, data: None, error: Some(error) }
+    }
+}
+
+// Route handlers
+async fn get_users(State(state): State<AppState>) -> Result<ResponseJson<ApiResponse<Vec<User>>>, StatusCode> {
+    match User::find_all(&state.db).await {
+        Ok(users) => Ok(ResponseJson(ApiResponse::success(users))),
+        Err(e) => {
+            User::log_error(&format!("Error fetching users: {}", e));
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn get_user_by_id(
+    State(state): State<AppState>,
+    Path(id): Path<i64>
+) -> Result<ResponseJson<ApiResponse<User>>, StatusCode> {
+    match User::find_by_id(id, &state.db).await {
+        Ok(Some(user)) => Ok(ResponseJson(ApiResponse::success(user))),
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            User::log_error(&format!("Error fetching user {}: {}", id, e));
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn create_user(
+    State(state): State<AppState>,
+    Json(req): Json<CreateUserRequest>
+) -> Result<(StatusCode, ResponseJson<ApiResponse<User>>), StatusCode> {
+    let user = User {
+        id: None,
+        name: req.name,
+        email: req.email,
+        is_active: true,
+        created_at: Utc::now(),
+    };
+
+    match user.create(&state.db).await {
+        Ok(created_user) => Ok((
+            StatusCode::CREATED,
+            ResponseJson(ApiResponse::success(created_user))
+        )),
+        Err(e) => {
+            User::log_error(&format!("Error creating user: {}", e));
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn update_user(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(mut user): Json<User>
+) -> Result<ResponseJson<ApiResponse<User>>, StatusCode> {
+    user.id = Some(id);
+
+    match user.update(&state.db).await {
+        Ok(updated_user) => Ok(ResponseJson(ApiResponse::success(updated_user))),
+        Err(e) => {
+            User::log_error(&format!("Error updating user {}: {}", id, e));
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn delete_user(
+    State(state): State<AppState>,
+    Path(id): Path<i64>
+) -> Result<ResponseJson<ApiResponse<String>>, StatusCode> {
+    let filter = FilterOperator::Single(Filter::eq("id", id));
+
+    match User::delete_where(filter, &state.db).await {
+        Ok(_) => Ok(ResponseJson(ApiResponse::success("User deleted successfully".to_string()))),
+        Err(e) => {
+            User::log_error(&format!("Error deleting user {}: {}", id, e));
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn get_active_users(State(state): State<AppState>) -> Result<ResponseJson<ApiResponse<Vec<User>>>, StatusCode> {
+    let filter = FilterOperator::Single(Filter::eq("is_active", true));
+
+    match User::find_where(filter, &state.db).await {
+        Ok(users) => Ok(ResponseJson(ApiResponse::success(users))),
+        Err(e) => {
+            User::log_error(&format!("Error fetching active users: {}", e));
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+// Create router with all routes
+fn create_router(state: AppState) -> Router {
+    Router::new()
+        .route("/users", get(get_users).post(create_user))
+        .route("/users/:id", get(get_user_by_id).put(update_user).delete(delete_user))
+        .route("/users/active", get(get_active_users))
+        .with_state(state)
+}
+
+// Main Cloudflare Workers handler
+#[event(fetch)]
+async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
+    console_error_panic_hook::set_once();
+
+    // Get database credentials from environment
+    let database_url = env.var("TURSO_DATABASE_URL")?.to_string();
+    let auth_token = env.var("TURSO_AUTH_TOKEN")?.to_string();
+
+    // Connect to database
+    let db = Database::new_connect(&database_url, &auth_token).await
+        .map_err(|e| format!("Database connection failed: {}", e))?;
+
+    // Create shared application state
+    let state = AppState {
+        db: Arc::new(db),
+    };
+
+    // Create router
+    let router = create_router(state);
+
+    // Handle the request with Axum router
+    router.call(req).await
+}
+```
+
+This example demonstrates:
+
+- **🏗️ Clean Architecture**: Separating models, DTOs, and handlers
+- **🔄 State Management**: Using Axum's state system for database sharing
+- **🛣️ RESTful Routing**: Complete CRUD operations with proper HTTP methods
+- **📊 Error Handling**: Comprehensive error handling with logging
+- **🎯 Type Safety**: Strong typing with request/response DTOs
+- **🚀 Performance**: Efficient database connection sharing
+- **📝 Logging**: Built-in console logging for debugging
+- **🔍 Advanced Queries**: Filtering and conditional operations
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/users` | Get all users |
+| POST | `/users` | Create a new user |
+| GET | `/users/:id` | Get user by ID |
+| PUT | `/users/:id` | Update user |
+| DELETE | `/users/:id` | Delete user |
+| GET | `/users/active` | Get all active users |
+
+### 🚀 Deployment
+
+To deploy this Cloudflare Workers application, you'll need a `wrangler.toml` configuration:
+
+```toml
+name = "my-cloudflare-app"
+main = "build/worker/shim.mjs"
+compatibility_date = "2023-05-18"
+
+[env.production.vars]
+TURSO_DATABASE_URL = "your-database-url"
+TURSO_AUTH_TOKEN = "your-auth-token"
+
+[[env.production.rules]]
+type = "CompiledWasm"
+globs = ["**/*.wasm"]
+fallthrough = true
+```
+
+**Deploy commands:**
+```bash
+# Install dependencies
+npm install -g wrangler
+
+# Deploy to Cloudflare Workers
+wrangler deploy
 ```
 
 ## 📚 Advanced Features

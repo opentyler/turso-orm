@@ -4,12 +4,14 @@
 //! for working with both libsql and WASM-only environments.
 
 #[cfg(all(feature = "libsql", target_arch = "wasm32"))]
-pub use libsql::{Value as LibsqlValue, Row as LibsqlRow, Error as LibsqlError};
+pub use libsql::wasm::Rows as LibsqlRows;
 #[cfg(all(feature = "libsql", target_arch = "wasm32"))]
-pub use libsql::wasm::{Rows as LibsqlRows};
+pub use libsql::{Error as LibsqlError, Row as LibsqlRow, Value as LibsqlValue};
 
 #[cfg(all(feature = "libsql", not(target_arch = "wasm32")))]
-pub use libsql::{Value as LibsqlValue, Row as LibsqlRow, Rows as LibsqlRows, Error as LibsqlError};
+pub use libsql::{
+    Error as LibsqlError, Row as LibsqlRow, Rows as LibsqlRows, Value as LibsqlValue,
+};
 
 #[cfg(not(feature = "libsql"))]
 #[derive(Debug, Clone, PartialEq)]
@@ -37,7 +39,9 @@ impl LibsqlRow {
     pub fn get(&self, index: usize) -> Result<&LibsqlValue, crate::error::Error> {
         // For WASM implementation, we'll use a simple index-based access
         // This is a stub - in a real implementation you'd map indices to column names
-        Err(crate::error::Error::Generic("Column access by index not supported in WASM mode".to_string()))
+        Err(crate::error::Error::Generic(
+            "Column access by index not supported in WASM mode".to_string(),
+        ))
     }
 
     pub fn get_value(&self, index: usize) -> Option<LibsqlValue> {

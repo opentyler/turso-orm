@@ -3,10 +3,10 @@
 //! This module handles the connection to Turso databases and provides
 //! query execution capabilities for Cloudflare Workers.
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "libsql"))]
-use libsql::Connection;
 #[cfg(all(target_arch = "wasm32", feature = "libsql"))]
 use libsql::wasm::{CloudflareSender, Connection};
+#[cfg(all(not(target_arch = "wasm32"), feature = "libsql"))]
+use libsql::Connection;
 
 /// Database connection wrapper for Turso in Cloudflare Workers
 ///
@@ -83,13 +83,19 @@ impl Database {
     /// }
     /// ```
     #[cfg(target_arch = "wasm32")]
-    pub async fn new_connect(url: &str, token: &str) -> std::result::Result<Self, crate::compat::LibsqlError> {
+    pub async fn new_connect(
+        url: &str,
+        token: &str,
+    ) -> std::result::Result<Self, crate::compat::LibsqlError> {
         let conn = Connection::open_cloudflare_worker(url.to_string(), token.to_string());
         conn.execute("SELECT 1", ()).await.map(|_| Self::from(conn))
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn new_connect(_url: &str, _token: &str) -> std::result::Result<Self, crate::compat::LibsqlError> {
+    pub async fn new_connect(
+        _url: &str,
+        _token: &str,
+    ) -> std::result::Result<Self, crate::compat::LibsqlError> {
         // For native builds, return an error directing users to use the full libsql crate
         panic!("Native database connections not supported in this build configuration. Use the 'libsql_default' feature for native support.")
     }
@@ -146,13 +152,21 @@ impl Database {
     }
 
     /// Query method stub for WASM-only builds
-    pub async fn query(&self, _sql: &str, _params: Vec<crate::compat::LibsqlValue>) -> Result<crate::compat::LibsqlRows, crate::compat::LibsqlError> {
+    pub async fn query(
+        &self,
+        _sql: &str,
+        _params: Vec<crate::compat::LibsqlValue>,
+    ) -> Result<crate::compat::LibsqlRows, crate::compat::LibsqlError> {
         // Return empty results for WASM-only builds
         Ok(crate::compat::LibsqlRows::new(vec![]))
     }
 
     /// Execute method stub for WASM-only builds
-    pub async fn execute(&self, _sql: &str, _params: Vec<crate::compat::LibsqlValue>) -> Result<u64, crate::compat::LibsqlError> {
+    pub async fn execute(
+        &self,
+        _sql: &str,
+        _params: Vec<crate::compat::LibsqlValue>,
+    ) -> Result<u64, crate::compat::LibsqlError> {
         // Return success for WASM-only builds (stub implementation)
         Ok(0)
     }
