@@ -205,8 +205,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
         let mut results = Vec::new();
         // Note: Manual transaction handling for WASM
-        db.execute("BEGIN", vec![])
-            .await?;
+        db.execute("BEGIN", vec![]).await?;
 
         for model in models {
             let map = model.to_map()?;
@@ -233,8 +232,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
             results.push(result);
         }
 
-        db.execute("COMMIT", vec![])
-            .await?;
+        db.execute("COMMIT", vec![]).await?;
         Ok(results)
     }
 
@@ -401,16 +399,14 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
         let mut results = Vec::new();
         // Note: Manual transaction handling for WASM
-        db.execute("BEGIN", vec![])
-            .await?;
+        db.execute("BEGIN", vec![]).await?;
 
         for model in models {
             let result = model.update(db).await?;
             results.push(result);
         }
 
-        db.execute("COMMIT", vec![])
-            .await?;
+        db.execute("COMMIT", vec![]).await?;
         Ok(results)
     }
 

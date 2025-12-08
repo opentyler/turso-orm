@@ -58,11 +58,7 @@
 //! let create_index = templates::create_index("idx_posts_title", "posts", &["title"]);
 //! ```
 
-use crate::{
-    compat::text_value,
-    database::Database,
-    error::Error,
-};
+use crate::{compat::text_value, database::Database, error::Error};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -203,9 +199,7 @@ impl MigrationManager {
         self.db.execute("BEGIN", vec![]).await?;
 
         // Execute the migration SQL
-        self.db
-            .execute(&migration.sql, vec![])
-            .await?;
+        self.db.execute(&migration.sql, vec![]).await?;
 
         // Record the migration
         let sql = r#"
