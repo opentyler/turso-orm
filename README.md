@@ -185,13 +185,15 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
-worker = { version = "0.7", features = ["http", "axum"] }
-worker-macros = { version = "0.7", features = ["http"] }
-axum = { version = "0.8", default-features = false }
+worker = { version = "0.7", features = ['http', 'axum'] }
+worker-macros = { version = "0.7", features = ['http'] }
+axum = { version = "0.8", default-features = false, features = ["json", "macros"] }
 tower-service = "0.3.3"
+libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+console_error_panic_hook = "0.1"
 
 # Use git version of libsql with newer worker dependency
 [patch.crates-io]
@@ -199,23 +201,41 @@ libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudfla
 ```
 
 ```rust
-use worker::*;
-use libsql_orm::{Model, Database, FilterOperator, Filter};
-use serde::{Serialize, Deserialize};
-use chrono::{DateTime, Utc};
 use axum::{
-    extract::{State, Path, Json},
+    extract::{Path, State},
     http::StatusCode,
-    response::Json as ResponseJson,
+    response::Json,
     routing::{get, post, put, delete},
     Router,
 };
+use tower_service::Service;
+use worker::*;
+use std::result::Result;
+use libsql_orm::{Model, Database, FilterOperator, Filter};
+use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
 // Application state
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Database>,
+}
+
+impl AppState {
+    pub async fn new(env: &Env) -> worker::Result<Self> {
+        // Get database credentials from environment
+        let database_url = env.var("TURSO_DATABASE_URL")?.to_string();
+        let auth_token = env.var("TURSO_AUTH_TOKEN")?.to_string();
+
+        // Connect to database
+        let db = Database::new_connect(&database_url, &auth_token).await
+            .map_err(|e| format!("Database connection failed: {}", e))?;
+
+        Ok(Self {
+            db: Arc::new(db),
+        })
+    }
 }
 
 // User model
@@ -253,35 +273,53 @@ impl<T> ApiResponse<T> {
     }
 }
 
+#[derive(Serialize)]
+struct ErrorResponse {
+    pub error: String,
+    pub message: String,
+}
+
 // Route handlers
-async fn get_users(State(state): State<AppState>) -> Result<ResponseJson<ApiResponse<Vec<User>>>, StatusCode> {
+#[worker::send]
+async fn get_users(State(state): State<AppState>) -> Result<Json<ApiResponse<Vec<User>>>, (StatusCode, Json<ErrorResponse>)> {
     match User::find_all(&state.db).await {
-        Ok(users) => Ok(ResponseJson(ApiResponse::success(users))),
+        Ok(users) => Ok(Json(ApiResponse::success(users))),
         Err(e) => {
-            User::log_error(&format!("Error fetching users: {}", e));
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            console_log!("Error fetching users: {}", e);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+                error: "internal_server_error".to_string(),
+                message: "Internal server error".to_string()
+            })))
         }
     }
 }
 
+#[worker::send]
 async fn get_user_by_id(
     State(state): State<AppState>,
     Path(id): Path<i64>
-) -> Result<ResponseJson<ApiResponse<User>>, StatusCode> {
+) -> Result<Json<ApiResponse<User>>, (StatusCode, Json<ErrorResponse>)> {
     match User::find_by_id(id, &state.db).await {
-        Ok(Some(user)) => Ok(ResponseJson(ApiResponse::success(user))),
-        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Ok(Some(user)) => Ok(Json(ApiResponse::success(user))),
+        Ok(None) => Err((StatusCode::NOT_FOUND, Json(ErrorResponse {
+            error: "user_not_found".to_string(),
+            message: "User not found".to_string()
+        }))),
         Err(e) => {
-            User::log_error(&format!("Error fetching user {}: {}", id, e));
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            console_log!("Error fetching user {}: {}", id, e);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+                error: "internal_server_error".to_string(),
+                message: "Internal server error".to_string()
+            })))
         }
     }
 }
 
+#[worker::send]
 async fn create_user(
     State(state): State<AppState>,
     Json(req): Json<CreateUserRequest>
-) -> Result<(StatusCode, ResponseJson<ApiResponse<User>>), StatusCode> {
+) -> Result<(StatusCode, Json<ApiResponse<User>>), (StatusCode, Json<ErrorResponse>)> {
     let user = User {
         id: None,
         name: req.name,
@@ -293,90 +331,110 @@ async fn create_user(
     match user.create(&state.db).await {
         Ok(created_user) => Ok((
             StatusCode::CREATED,
-            ResponseJson(ApiResponse::success(created_user))
+            Json(ApiResponse::success(created_user))
         )),
         Err(e) => {
-            User::log_error(&format!("Error creating user: {}", e));
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            console_log!("Error creating user: {}", e);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+                error: "internal_server_error".to_string(),
+                message: "Internal server error".to_string()
+            })))
         }
     }
 }
 
+#[worker::send]
 async fn update_user(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(mut user): Json<User>
-) -> Result<ResponseJson<ApiResponse<User>>, StatusCode> {
+) -> Result<Json<ApiResponse<User>>, (StatusCode, Json<ErrorResponse>)> {
     user.id = Some(id);
 
     match user.update(&state.db).await {
-        Ok(updated_user) => Ok(ResponseJson(ApiResponse::success(updated_user))),
+        Ok(updated_user) => Ok(Json(ApiResponse::success(updated_user))),
         Err(e) => {
-            User::log_error(&format!("Error updating user {}: {}", id, e));
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            console_log!("Error updating user {}: {}", id, e);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+                error: "internal_server_error".to_string(),
+                message: "Internal server error".to_string()
+            })))
         }
     }
 }
 
+#[worker::send]
 async fn delete_user(
     State(state): State<AppState>,
     Path(id): Path<i64>
-) -> Result<ResponseJson<ApiResponse<String>>, StatusCode> {
+) -> Result<Json<ApiResponse<String>>, (StatusCode, Json<ErrorResponse>)> {
     let filter = FilterOperator::Single(Filter::eq("id", id));
 
     match User::delete_where(filter, &state.db).await {
-        Ok(_) => Ok(ResponseJson(ApiResponse::success("User deleted successfully".to_string()))),
+        Ok(_) => Ok(Json(ApiResponse::success("User deleted successfully".to_string()))),
         Err(e) => {
-            User::log_error(&format!("Error deleting user {}: {}", id, e));
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            console_log!("Error deleting user {}: {}", id, e);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+                error: "internal_server_error".to_string(),
+                message: "Internal server error".to_string()
+            })))
         }
     }
 }
 
-async fn get_active_users(State(state): State<AppState>) -> Result<ResponseJson<ApiResponse<Vec<User>>>, StatusCode> {
+#[worker::send]
+async fn get_active_users(State(state): State<AppState>) -> Result<Json<ApiResponse<Vec<User>>>, (StatusCode, Json<ErrorResponse>)> {
     let filter = FilterOperator::Single(Filter::eq("is_active", true));
 
     match User::find_where(filter, &state.db).await {
-        Ok(users) => Ok(ResponseJson(ApiResponse::success(users))),
+        Ok(users) => Ok(Json(ApiResponse::success(users))),
         Err(e) => {
-            User::log_error(&format!("Error fetching active users: {}", e));
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            console_log!("Error fetching active users: {}", e);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+                error: "internal_server_error".to_string(),
+                message: "Internal server error".to_string()
+            })))
         }
     }
 }
 
 // Create router with all routes
-fn create_router(state: AppState) -> Router {
+fn create_router() -> Router<AppState> {
     Router::new()
         .route("/users", get(get_users).post(create_user))
-        .route("/users/:id", get(get_user_by_id).put(update_user).delete(delete_user))
         .route("/users/active", get(get_active_users))
-        .with_state(state)
+        .route("/users/:id", get(get_user_by_id).put(update_user).delete(delete_user))
 }
 
 // Main Cloudflare Workers handler
 #[event(fetch)]
-async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
+async fn fetch(
+    req: HttpRequest,
+    env: Env,
+    _ctx: Context,
+) -> worker::Result<axum::http::Response<axum::body::Body>> {
     console_error_panic_hook::set_once();
 
-    // Get database credentials from environment
-    let database_url = env.var("TURSO_DATABASE_URL")?.to_string();
-    let auth_token = env.var("TURSO_AUTH_TOKEN")?.to_string();
-
-    // Connect to database
-    let db = Database::new_connect(&database_url, &auth_token).await
-        .map_err(|e| format!("Database connection failed: {}", e))?;
-
-    // Create shared application state
-    let state = AppState {
-        db: Arc::new(db),
+    // Initialize application state
+    let app_state = match AppState::new(&env).await {
+        Ok(state) => state,
+        Err(e) => {
+            console_log!("Failed to initialize application state: {}", e);
+            return Ok(axum::http::Response::builder()
+                .status(500)
+                .header("content-type", "application/json")
+                .body(axum::body::Body::from(
+                    "{\"error\":\"initialization_failed\",\"message\":\"Failed to initialize application\"}"
+                ))?
+            );
+        }
     };
 
     // Create router
-    let router = create_router(state);
+    let mut router = create_router().with_state(app_state);
 
-    // Handle the request with Axum router
-    router.call(req).await
+    // Handle the request
+    Ok(router.call(req).await?)
 }
 ```
 
@@ -385,11 +443,12 @@ This example demonstrates:
 - **🏗️ Clean Architecture**: Separating models, DTOs, and handlers
 - **🔄 State Management**: Using Axum's state system for database sharing
 - **🛣️ RESTful Routing**: Complete CRUD operations with proper HTTP methods
-- **📊 Error Handling**: Comprehensive error handling with logging
+- **📊 Error Handling**: Comprehensive error handling with tuple returns
 - **🎯 Type Safety**: Strong typing with request/response DTOs
-- **🚀 Performance**: Efficient database connection sharing
-- **📝 Logging**: Built-in console logging for debugging
+- **🚀 Performance**: Efficient database connection sharing with `AppState::new()`
+- **📝 Logging**: Built-in `console_log!` macro for debugging
 - **🔍 Advanced Queries**: Filtering and conditional operations
+- **⚡ Worker Integration**: `#[worker::send]` attributes for optimal performance
 
 ### API Endpoints
 
