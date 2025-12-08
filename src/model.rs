@@ -88,12 +88,12 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         Self::log_info(&format!("Creating record in table: {}", Self::table_name()));
         Self::log_debug(&format!("SQL: {sql}"));
 
-        let params: Vec<libsql::Value> = map
+        let params: Vec<crate::compat::LibsqlValue> = map
             .values()
             .map(|v| Self::value_to_libsql_value(v))
             .collect();
 
-        db.inner.execute(&sql, params).await?;
+        db.execute(&sql, params).await?;
         let id = 1i64; // Placeholder - libsql WASM doesn't support last_insert_rowid
 
         let mut result = self.clone();
@@ -170,12 +170,12 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         ));
         Self::log_debug(&format!("SQL: {sql}"));
 
-        let mut rows = db.inner.query(&sql, where_params).await?;
+        let mut rows = db.query(&sql, where_params).await?;
 
         if let Some(row) = rows.next().await? {
             // Record exists, update it
             if let Some(existing_id) = row.get_value(0).ok().and_then(|v| match v {
-                libsql::Value::Integer(i) => Some(i),
+                crate::compat::LibsqlValue::Integer(i) => Some(i),
                 _ => None,
             }) {
                 Self::log_info(&format!(
@@ -205,8 +205,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
         let mut results = Vec::new();
         // Note: Manual transaction handling for WASM
-        db.inner
-            .execute("BEGIN", vec![libsql::Value::Null; 0])
+        db.execute("BEGIN", vec![crate::compat::null_value(); 0])
             .await?;
 
         for model in models {
@@ -221,12 +220,12 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
                 values.join(", ")
             );
 
-            let params: Vec<libsql::Value> = map
+            let params: Vec<crate::compat::LibsqlValue> = map
                 .values()
                 .map(|v| Self::value_to_libsql_value(v))
                 .collect();
 
-            db.inner.execute(&sql, params).await?;
+            db.execute(&sql, params).await?;
             let id = 1i64; // Placeholder - libsql WASM doesn't support last_insert_rowid
 
             let mut result = model.clone();
@@ -234,8 +233,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
             results.push(result);
         }
 
-        db.inner
-            .execute("COMMIT", vec![libsql::Value::Null; 0])
+        db.execute("COMMIT", vec![crate::compat::null_value(); 0])
             .await?;
         Ok(results)
     }
@@ -253,7 +251,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
         let mut rows = db
             .inner
-            .query(&sql, vec![libsql::Value::Integer(id)])
+            .query(&sql, vec![crate::compat::integer_value(id)])
             .await?;
 
         if let Some(row) = rows.next().await? {
@@ -322,13 +320,13 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
     /// Count all records
     async fn count(db: &Database) -> Result<u64> {
         let sql = format!("SELECT COUNT(*) FROM {}", Self::table_name());
-        let mut rows = db.inner.query(&sql, vec![libsql::Value::Null; 0]).await?;
+        let mut rows = db.query(&sql, vec![crate::compat::null_value(); 0]).await?;
 
         if let Some(row) = rows.next().await? {
             row.get_value(0)
                 .ok()
                 .and_then(|v| match v {
-                    libsql::Value::Integer(i) => Some(i as u64),
+                    crate::compat::LibsqlValue::Integer(i) => Some(i as u64),
                     _ => None,
                 })
                 .ok_or_else(|| Error::Query("Failed to get count".to_string()))
@@ -342,13 +340,13 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         let builder = QueryBuilder::new(Self::table_name()).r#where(filter);
 
         let (sql, params) = builder.build_count()?;
-        let mut rows = db.inner.query(&sql, params).await?;
+        let mut rows = db.query(&sql, params).await?;
 
         if let Some(row) = rows.next().await? {
             row.get_value(0)
                 .ok()
                 .and_then(|v| match v {
-                    libsql::Value::Integer(i) => Some(i as u64),
+                    crate::compat::LibsqlValue::Integer(i) => Some(i as u64),
                     _ => None,
                 })
                 .ok_or_else(|| Error::Query("Failed to get count".to_string()))
@@ -380,14 +378,14 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         Self::log_info(&format!("Updating record with ID: {}", mask_id(id)));
         Self::log_debug(&format!("SQL: {sql}"));
 
-        let mut params: Vec<libsql::Value> = map
+        let mut params: Vec<crate::compat::LibsqlValue> = map
             .iter()
             .filter(|(k, _)| k != &Self::primary_key())
             .map(|(_, v)| Self::value_to_libsql_value(v))
             .collect();
-        params.push(libsql::Value::Integer(id));
+        params.push(crate::compat::integer_value(id));
 
-        db.inner.execute(&sql, params).await?;
+        db.execute(&sql, params).await?;
         Self::log_info(&format!(
             "Successfully updated record with ID: {}",
             mask_id(id)
@@ -403,8 +401,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
         let mut results = Vec::new();
         // Note: Manual transaction handling for WASM
-        db.inner
-            .execute("BEGIN", vec![libsql::Value::Null; 0])
+        db.execute("BEGIN", vec![crate::compat::null_value(); 0])
             .await?;
 
         for model in models {
@@ -412,8 +409,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
             results.push(result);
         }
 
-        db.inner
-            .execute("COMMIT", vec![libsql::Value::Null; 0])
+        db.execute("COMMIT", vec![crate::compat::null_value(); 0])
             .await?;
         Ok(results)
     }
@@ -433,8 +429,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         Self::log_info(&format!("Deleting record with ID: {}", mask_id(id)));
         Self::log_debug(&format!("SQL: {sql}"));
 
-        db.inner
-            .execute(&sql, vec![libsql::Value::Integer(id)])
+        db.execute(&sql, vec![crate::compat::integer_value(id)])
             .await?;
         Self::log_info(&format!(
             "Successfully deleted record with ID: {}",
@@ -457,8 +452,8 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
             placeholders.join(", ")
         );
 
-        let params: Vec<libsql::Value> = ids.iter().map(|&id| libsql::Value::Integer(id)).collect();
-        db.inner.execute(&sql, params).await?;
+        let params: Vec<crate::compat::LibsqlValue> = ids.iter().map(|&id| crate::compat::integer_value(id)).collect();
+        db.execute(&sql, params).await?;
         Ok(ids.len() as u64)
     }
 
@@ -468,7 +463,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
         let (sql, params) = builder.build()?;
         let delete_sql = sql.replace("SELECT *", "DELETE");
-        db.inner.execute(&delete_sql, params).await?;
+        db.execute(&delete_sql, params).await?;
 
         // Note: SQLite doesn't return the number of affected rows directly
         // This is a simplified implementation
@@ -537,15 +532,15 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         }
 
         let (sql, params) = builder.build()?;
-        let mut rows = db.inner.query(&sql, params).await?;
+        let mut rows = db.query(&sql, params).await?;
 
         if let Some(row) = rows.next().await? {
             let value = row
                 .get_value(0)
                 .ok()
                 .and_then(|v| match v {
-                    libsql::Value::Integer(i) => Some(i as f64),
-                    libsql::Value::Real(f) => Some(f),
+                    crate::compat::LibsqlValue::Integer(i) => Some(i as f64),
+                    crate::compat::LibsqlValue::Real(f) => Some(f),
                     _ => None,
                 })
                 .ok_or_else(|| Error::Query("Failed to get aggregate value".to_string()))?;
@@ -556,37 +551,37 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
     }
 
     /// Convert a database row to a HashMap
-    fn row_to_map(row: &libsql::Row) -> Result<HashMap<String, crate::Value>> {
+    fn row_to_map(row: &crate::compat::LibsqlRow) -> Result<HashMap<String, crate::Value>> {
         let mut map = HashMap::new();
         for i in 0..row.column_count() {
             if let Some(column_name) = row.column_name(i) {
-                let value = row.get_value(i).unwrap_or(libsql::Value::Null);
+                let value = row.get_value(i).unwrap_or(crate::compat::null_value());
                 map.insert(column_name.to_string(), Self::libsql_value_to_value(&value));
             }
         }
         Ok(map)
     }
 
-    /// Convert our Value type to libsql::Value
-    fn value_to_libsql_value(value: &crate::Value) -> libsql::Value {
+    /// Convert our Value type to crate::compat::LibsqlValue
+    fn value_to_libsql_value(value: &crate::Value) -> crate::compat::LibsqlValue {
         match value {
-            crate::Value::Null => libsql::Value::Null,
-            crate::Value::Integer(i) => libsql::Value::Integer(*i),
-            crate::Value::Real(f) => libsql::Value::Real(*f),
-            crate::Value::Text(s) => libsql::Value::Text(s.clone()),
-            crate::Value::Blob(b) => libsql::Value::Blob(b.clone()),
-            crate::Value::Boolean(b) => libsql::Value::Integer(if *b { 1 } else { 0 }),
+            crate::Value::Null => crate::compat::null_value(),
+            crate::Value::Integer(i) => crate::compat::LibsqlValue::Integer(*i),
+            crate::Value::Real(f) => crate::compat::LibsqlValue::Real(*f),
+            crate::Value::Text(s) => crate::compat::LibsqlValue::Text(s.clone()),
+            crate::Value::Blob(b) => crate::compat::LibsqlValue::Blob(b.clone()),
+            crate::Value::Boolean(b) => crate::compat::LibsqlValue::Integer(if *b { 1 } else { 0 }),
         }
     }
 
-    /// Convert libsql::Value to our Value type
-    fn libsql_value_to_value(value: &libsql::Value) -> crate::Value {
+    /// Convert crate::compat::LibsqlValue to our Value type
+    fn libsql_value_to_value(value: &crate::compat::LibsqlValue) -> crate::Value {
         match value {
-            libsql::Value::Null => crate::Value::Null,
-            libsql::Value::Integer(i) => crate::Value::Integer(*i),
-            libsql::Value::Real(f) => crate::Value::Real(*f),
-            libsql::Value::Text(s) => crate::Value::Text(s.clone()),
-            libsql::Value::Blob(b) => crate::Value::Blob(b.clone()),
+            crate::compat::LibsqlValue::Null => crate::Value::Null,
+            crate::compat::LibsqlValue::Integer(i) => crate::Value::Integer(*i),
+            crate::compat::LibsqlValue::Real(f) => crate::Value::Real(*f),
+            crate::compat::LibsqlValue::Text(s) => crate::Value::Text(s.clone()),
+            crate::compat::LibsqlValue::Blob(b) => crate::Value::Blob(b.clone()),
         }
     }
 
@@ -594,6 +589,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
     fn log_info(message: &str) {
         #[cfg(target_arch = "wasm32")]
         {
+            #[cfg(feature = "web-sys")]
             web_sys::console::log_1(&format!("[INFO] {}: {}", Self::table_name(), message).into());
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -606,6 +602,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
     fn log_debug(message: &str) {
         #[cfg(target_arch = "wasm32")]
         {
+            #[cfg(feature = "web-sys")]
             web_sys::console::log_1(&format!("[DEBUG] {}: {}", Self::table_name(), message).into());
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -618,6 +615,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
     fn log_warn(message: &str) {
         #[cfg(target_arch = "wasm32")]
         {
+            #[cfg(feature = "web-sys")]
             web_sys::console::warn_1(&format!("[WARN] {}: {}", Self::table_name(), message).into());
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -630,6 +628,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
     fn log_error(message: &str) {
         #[cfg(target_arch = "wasm32")]
         {
+            #[cfg(feature = "web-sys")]
             web_sys::console::error_1(
                 &format!("[ERROR] {}: {}", Self::table_name(), message).into(),
             );

@@ -78,6 +78,7 @@ impl fmt::Display for Error {
     }
 }
 
+#[cfg(feature = "libsql")]
 impl From<libsql::Error> for Error {
     fn from(err: libsql::Error) -> Self {
         Error::Sql(err.to_string())

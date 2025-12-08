@@ -56,7 +56,7 @@
 //! let create_index = templates::create_index("idx_posts_title", "posts", &["title"]);
 //! ```
 
-use crate::{database::Database, error::Error};
+use crate::{database::Database, error::Error, compat::{null_value, text_value}};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -130,9 +130,9 @@ impl MigrationManager {
             )
         "#;
 
-        let params = vec![libsql::Value::Null; 0];
+        let params = vec![null_value(); 0];
 
-        self.db.inner.execute(sql, params).await?;
+        self.db.execute(sql, params).await?;
         Ok(())
     }
 
@@ -149,13 +149,20 @@ impl MigrationManager {
 
     /// Get all migrations from the database
     pub async fn get_migrations(&self) -> Result<Vec<Migration>, Error> {
-        let sql =
-            "SELECT id, name, sql, created_at, executed_at FROM migrations ORDER BY created_at";
-        let mut rows = self
-            .db
-            .inner
-            .query(sql, vec![libsql::Value::Null; 0])
-            .await?;
+        #[cfg(not(feature = "libsql"))]
+        {
+            // Return empty migrations for WASM-only builds
+            return Ok(vec![]);
+        }
+
+        #[cfg(feature = "libsql")]
+        {
+            let sql =
+                "SELECT id, name, sql, created_at, executed_at FROM migrations ORDER BY created_at";
+            let mut rows = self
+                .db
+                .query(sql, vec![null_value(); 0])
+                .await?;
 
         let mut migrations = Vec::new();
         while let Some(row) = rows.next().await? {
@@ -182,20 +189,19 @@ impl MigrationManager {
         }
 
         Ok(migrations)
+        }
     }
 
     /// Execute a migration
     pub async fn execute_migration(&self, migration: &Migration) -> Result<(), Error> {
         // Begin transaction
         self.db
-            .inner
-            .execute("BEGIN", vec![libsql::Value::Null; 0])
+            .execute("BEGIN", vec![null_value(); 0])
             .await?;
 
         // Execute the migration SQL
         self.db
-            .inner
-            .execute(&migration.sql, vec![libsql::Value::Null; 0])
+            .execute(&migration.sql, vec![null_value(); 0])
             .await?;
 
         // Record the migration
@@ -205,23 +211,21 @@ impl MigrationManager {
         "#;
 
         self.db
-            .inner
             .execute(
                 sql,
                 vec![
-                    libsql::Value::Text(migration.id.clone()),
-                    libsql::Value::Text(migration.name.clone()),
-                    libsql::Value::Text(migration.sql.clone()),
-                    libsql::Value::Text(migration.created_at.to_rfc3339()),
-                    libsql::Value::Text(Utc::now().to_rfc3339()),
+                    text_value(migration.id.clone()),
+                    text_value(migration.name.clone()),
+                    text_value(migration.sql.clone()),
+                    text_value(migration.created_at.to_rfc3339()),
+                    text_value(Utc::now().to_rfc3339()),
                 ],
             )
             .await?;
 
         // Commit transaction
         self.db
-            .inner
-            .execute("COMMIT", vec![libsql::Value::Null; 0])
+            .execute("COMMIT", vec![null_value(); 0])
             .await?;
 
         Ok(())
@@ -231,8 +235,7 @@ impl MigrationManager {
     pub async fn rollback_migration(&self, migration_id: &str) -> Result<(), Error> {
         let sql = "DELETE FROM migrations WHERE id = ?";
         self.db
-            .inner
-            .execute(sql, vec![libsql::Value::Text(migration_id.to_string())])
+            .execute(sql, vec![text_value(migration_id.to_string())])
             .await?;
         Ok(())
     }

@@ -194,6 +194,7 @@
 //!     Response::from_json(&users)
 //! }
 //! ```
+pub mod compat;
 pub mod database;
 pub mod error;
 pub mod filters;

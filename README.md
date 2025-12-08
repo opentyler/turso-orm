@@ -1,4 +1,4 @@
-# turso-orm
+# libsql-orm
 
 [![Crates.io](https://img.shields.io/crates/v/libsql-orm.svg)](https://crates.io/crates/libsql-orm)
 [![Documentation](https://docs.rs/libsql-orm/badge.svg)](https://docs.rs/libsql-orm)
@@ -30,15 +30,28 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-libsql-orm = "0.1.0"
+libsql-orm = { version = "0.2.3", features = ["cloudflare"] }
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
+
+# Required for Cloudflare Workers support - use git version of libsql with newer worker dependency
+[patch.crates-io]
+libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudflare"] }
 ```
+
+### Why the Git Patch?
+
+For Cloudflare Workers compatibility, you need to use a patched version of libsql that includes:
+- Updated `worker` dependency compatibility
+- Enhanced WASM support for edge environments
+- Cloudflare-specific optimizations
+
+The patch ensures seamless integration with Cloudflare Workers' runtime environment.
 
 ### Basic Usage
 
 ```rust
-use libsql_orm::{Model, Database, FilterOperator, Value};
+use libsql_orm::{Model, Database, FilterOperator, Filter, Value};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
@@ -77,7 +90,7 @@ async fn example() -> Result<(), Box<dyn std::error::Error>> {
     
     // Query with conditions
     let active_users = User::find_where(
-        FilterOperator::Eq("is_active".to_string(), crate::Value::Boolean(true)),
+        FilterOperator::Single(Filter::eq("is_active", true)),
         &db
     ).await?;
     
@@ -87,9 +100,27 @@ async fn example() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Cloudflare Workers Integration
 
+First, ensure your `Cargo.toml` includes the necessary features and patches:
+
+```toml
+[dependencies]
+libsql-orm = { version = "0.2.3", features = ["cloudflare"] }
+worker = ">=0.7.0"
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Use git version of libsql with newer worker dependency
+[patch.crates-io]
+libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudflare"] }
+```
+
+Then in your worker code:
+
 ```rust
 use worker::*;
-use libsql_orm::{Model, Database, MigrationManager, generate_migration};
+use libsql_orm::{Model, Database};
+use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
 
 #[derive(Model, Debug, Clone, Serialize, Deserialize)]
 #[table_name("blog_posts")]  // Custom table name
@@ -117,14 +148,14 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     // Handle the request
     match req.method() {
         Method::Get => {
-            let posts = Post::find_all(db).await
-                .map_err(|e| format!("Query failed: {}", e))?;
+            let posts = Post::find_all(&db).await
+                .map_err(|e| format!("Query failed: {}", e)))?;
             Response::from_json(&posts)
         }
         Method::Post => {
             let post: Post = req.json().await?;
-            let saved_post = post.create(db).await
-                .map_err(|e| format!("Create failed: {}", e))?;
+            let saved_post = post.create(&db).await
+                .map_err(|e| format!("Create failed: {}", e)))?;
             Response::from_json(&saved_post)
         }
         _ => Response::error("Method not allowed", 405)
@@ -160,10 +191,10 @@ assert_eq!(User::table_name(), "user_accounts");
 
 ### Boolean Type Safety
 
-turso-orm automatically handles boolean conversion between SQLite and Rust:
+libsql-orm automatically handles boolean conversion between SQLite and Rust:
 
 ```rust
-use libsql_orm::{Model, FilterOperator, Value};
+use libsql_orm::{Model, FilterOperator, Filter, Value};
 use serde::{Serialize, Deserialize};
 
 #[derive(Model, Serialize, Deserialize)]
@@ -178,7 +209,7 @@ struct User {
 
 // All boolean operations work seamlessly
 let user = User::find_where(
-    FilterOperator::Eq("is_active".to_string(), Value::Boolean(true)),
+    FilterOperator::Single(Filter::eq("is_active", true)),
     &db
 ).await?;
 
@@ -221,12 +252,12 @@ struct Product {
 ### Query Builder
 
 ```rust
-use libsql_orm::{QueryBuilder, FilterOperator, Sort, SortOrder, Pagination};
+use libsql_orm::{QueryBuilder, FilterOperator, Filter, Sort, SortOrder, Pagination};
 
 // Complex query with filtering and pagination
 let query = QueryBuilder::new("users")
     .select(&["id", "name", "email"])
-    .r#where(FilterOperator::Gte("age".to_string(), Value::Integer(18)))
+    .r#where(FilterOperator::Single(Filter::ge("age", 18i64)))
     .order_by(Sort::new("created_at", SortOrder::Desc))
     .limit(10)
     .offset(20);
@@ -285,7 +316,7 @@ let avg_age = User::aggregate(
 
 // Count with filter
 let active_users_count = User::count_where(
-    FilterOperator::Eq("is_active".to_string(), Value::Boolean(true)),
+    FilterOperator::Single(Filter::eq("is_active", true)),
     &db
 ).await?;
 ```
@@ -293,13 +324,15 @@ let active_users_count = User::count_where(
 ### Search
 
 ```rust
-use libsql_orm::SearchFilter;
+use libsql_orm::{SearchFilter, Pagination};
 
 let search = SearchFilter::new(
-    vec!["name".to_string(), "email".to_string()],
-    "john".to_string()
+    "john",
+    vec!["name", "email"]
 );
 
+// Optional pagination
+let pagination = Pagination::new(1, 10);
 let results = User::search(&search, Some(&pagination), &db).await?;
 ```
 
@@ -343,7 +376,7 @@ let saved_user = user.upsert(&["email", "username"], &db).await?;
 
 ### WASM Compatibility
 
-turso-orm is built from the ground up for WebAssembly environments:
+libsql-orm is built from the ground up for WebAssembly environments:
 
 - Uses `libsql` WASM bindings for database connectivity
 - Optimized async runtime for edge computing
@@ -353,7 +386,7 @@ turso-orm is built from the ground up for WebAssembly environments:
 
 ## 🔗 Ecosystem
 
-turso-orm works great with:
+libsql-orm works great with:
 
 - **[Turso Database](https://github.com/tursodatabase)** - The database platform
 - **[Turso](https://turso.tech/)** - Managed Turso hosting

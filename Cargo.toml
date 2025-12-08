@@ -1,6 +1,6 @@
 [package]
 name = "libsql-orm"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 authors = ["Ayon Saha <ayonsaha2011@gmail.com>"]
 description = "A powerful, async-first ORM for Turso Database with first-class support for Cloudflare Workers and WebAssembly environments. Features include automatic boolean conversion, upsert operations, built-in logging, migrations, and comprehensive query building."
@@ -24,15 +24,17 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-libsql = { version = "1.9", default-features = false, path = "./libsql" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1.0", features = ["v4", "serde", "js"] }
-libsql-orm-macros = { version = "0.1", path = "./libsql-orm-macros" }
-anyhow = "1.0"
+# libsql is only available for non-WASM targets due to C dependencies
+libsql = { version = "0.9", default-features = false, optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+chrono = { version = "0.4", features = ["serde"], optional = true }
+uuid = { version = "1.0", features = ["v4", "serde", "js"], optional = true }
+libsql-orm-macros = { version = "0.1", path = "./libsql-orm-macros", optional = true }
+anyhow = { version = "1.0", optional = true }
 worker = { version = ">=0.7.0", optional = true }
 web-sys = { version = "0.3", features = ["console"], optional = true }
+getrandom = { version = "0.2", features = ["js"] }
 log = "0.4"
 
 [dev-dependencies]
@@ -41,8 +43,11 @@ env_logger = "0.10"
 
 [features]
 default = ["libsql_default"]
-cloudflare = ["worker", "web-sys", "libsql/cloudflare"]
-libsql_default = ["libsql/default"]
+cloudflare = ["libsql", "worker", "web-sys", "getrandom/js", "dep:serde", "dep:serde_json", "dep:chrono", "dep:uuid", "dep:libsql-orm-macros", "dep:anyhow"]
+libsql_default = ["libsql", "dep:serde", "dep:serde_json", "dep:chrono", "dep:uuid", "dep:libsql-orm-macros", "dep:anyhow"]
+libsql = ["dep:libsql"]
+native = ["libsql"]
+wasm_only = ["worker", "web-sys", "getrandom/js"]
 
 [lib]
 name = "libsql_orm"
@@ -51,11 +56,20 @@ crate-type = ["cdylib", "rlib"]
 
 
 [workspace]
-members = [".", "libsql-orm-macros", "libsql"]
+members = [".", "libsql-orm-macros"]
 resolver = "2"
 
 [workspace.dependencies]
 worker = ">=0.7.0"
+
+
+# Use git version of libsql with newer worker dependency
+[patch.crates-io]
+libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudflare"] }
+
+# Target-specific configurations for libsql
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+libsql = { version = "0.9", default-features = false, features = ["cloudflare"], optional = true }
 
 
 

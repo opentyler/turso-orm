@@ -296,7 +296,7 @@ impl QueryBuilder {
     pub fn where_condition(
         mut self,
         condition: &str,
-        _params: impl Into<Vec<libsql::Value>>,
+        _params: impl Into<Vec<crate::compat::LibsqlValue>>,
     ) -> Self {
         // This is a simplified implementation - in a real implementation you'd parse the condition
         self.where_clauses
@@ -338,7 +338,7 @@ impl QueryBuilder {
     pub fn having_condition(
         mut self,
         condition: &str,
-        _params: impl Into<Vec<libsql::Value>>,
+        _params: impl Into<Vec<crate::compat::LibsqlValue>>,
     ) -> Self {
         // This is a simplified implementation
         self.having
@@ -363,7 +363,7 @@ impl QueryBuilder {
             row.get_value(0)
                 .ok()
                 .and_then(|v| match v {
-                    libsql::Value::Integer(i) => Some(i as u64),
+                    crate::compat::LibsqlValue::Integer(i) => Some(i as u64),
                     _ => None,
                 })
                 .ok_or_else(|| crate::Error::Query("Failed to get count".to_string()))
@@ -373,7 +373,7 @@ impl QueryBuilder {
     }
 
     /// Execute aggregate query
-    pub async fn execute_aggregate(&self, db: &Database) -> Result<Vec<libsql::Row>> {
+    pub async fn execute_aggregate(&self, db: &Database) -> Result<Vec<crate::compat::LibsqlRow>> {
         let (sql, params) = self.build()?;
         let mut rows = db.query(&sql, params).await?;
         let mut results = Vec::new();
@@ -384,7 +384,7 @@ impl QueryBuilder {
     }
 
     /// Build the SQL query
-    pub fn build(&self) -> Result<(String, Vec<libsql::Value>)> {
+    pub fn build(&self) -> Result<(String, Vec<crate::compat::LibsqlValue>)> {
         let mut sql = String::new();
         let mut params = Vec::new();
 
@@ -459,7 +459,7 @@ impl QueryBuilder {
     }
 
     /// Build a count query
-    pub fn build_count(&self) -> Result<(String, Vec<libsql::Value>)> {
+    pub fn build_count(&self) -> Result<(String, Vec<crate::compat::LibsqlValue>)> {
         let mut sql = String::new();
         let mut params = Vec::new();
 
@@ -505,7 +505,7 @@ impl QueryBuilder {
     fn build_where_clause(
         &self,
         filters: &[FilterOperator],
-    ) -> Result<(String, Vec<libsql::Value>)> {
+    ) -> Result<(String, Vec<crate::compat::LibsqlValue>)> {
         let mut sql = String::new();
         let mut params = Vec::new();
 
@@ -525,7 +525,7 @@ impl QueryBuilder {
     fn build_filter_operator(
         &self,
         filter: &FilterOperator,
-    ) -> Result<(String, Vec<libsql::Value>)> {
+    ) -> Result<(String, Vec<crate::compat::LibsqlValue>)> {
         match filter {
             FilterOperator::Single(filter) => self.build_filter(filter),
             FilterOperator::And(filters) => {
@@ -567,7 +567,7 @@ impl QueryBuilder {
     }
 
     /// Build individual filter
-    fn build_filter(&self, filter: &crate::Filter) -> Result<(String, Vec<libsql::Value>)> {
+    fn build_filter(&self, filter: &crate::Filter) -> Result<(String, Vec<crate::compat::LibsqlValue>)> {
         let mut sql = String::new();
         let mut params = Vec::new();
 
@@ -608,15 +608,15 @@ impl QueryBuilder {
         Ok((sql, params))
     }
 
-    /// Convert our Value type to libsql::Value
-    fn value_to_libsql_value(&self, value: &Value) -> libsql::Value {
+    /// Convert our Value type to crate::compat::LibsqlValue
+    fn value_to_libsql_value(&self, value: &Value) -> crate::compat::LibsqlValue {
         match value {
-            Value::Null => libsql::Value::Null,
-            Value::Integer(i) => libsql::Value::Integer(*i),
-            Value::Real(f) => libsql::Value::Real(*f),
-            Value::Text(s) => libsql::Value::Text(s.clone()),
-            Value::Blob(b) => libsql::Value::Blob(b.clone()),
-            Value::Boolean(b) => libsql::Value::Integer(if *b { 1 } else { 0 }),
+            Value::Null => crate::compat::LibsqlValue::Null,
+            Value::Integer(i) => crate::compat::LibsqlValue::Integer(*i),
+            Value::Real(f) => crate::compat::LibsqlValue::Real(*f),
+            Value::Text(s) => crate::compat::LibsqlValue::Text(s.clone()),
+            Value::Blob(b) => crate::compat::LibsqlValue::Blob(b.clone()),
+            Value::Boolean(b) => crate::compat::LibsqlValue::Integer(if *b { 1 } else { 0 }),
         }
     }
 
@@ -633,7 +633,7 @@ impl QueryBuilder {
             let mut map = HashMap::new();
             for i in 0..row.column_count() {
                 if let Some(column_name) = row.column_name(i) {
-                    let value = row.get_value(i).unwrap_or(libsql::Value::Null);
+                    let value = row.get_value(i).unwrap_or(crate::compat::LibsqlValue::Null);
                     map.insert(
                         column_name.to_string(),
                         self.libsql_value_to_json_value(&value),
@@ -666,7 +666,7 @@ impl QueryBuilder {
             row.get_value(0)
                 .ok()
                 .and_then(|v| match v {
-                    libsql::Value::Integer(i) => Some(i as u64),
+                    crate::compat::LibsqlValue::Integer(i) => Some(i as u64),
                     _ => None,
                 })
                 .unwrap_or(0)
@@ -685,20 +685,20 @@ impl QueryBuilder {
         Ok(PaginatedResult::with_total(data, pagination.clone(), total))
     }
 
-    /// Convert libsql::Value to serde_json::Value
-    fn libsql_value_to_json_value(&self, value: &libsql::Value) -> serde_json::Value {
+    /// Convert crate::compat::LibsqlValue to serde_json::Value
+    fn libsql_value_to_json_value(&self, value: &crate::compat::LibsqlValue) -> serde_json::Value {
         match value {
-            libsql::Value::Null => serde_json::Value::Null,
-            libsql::Value::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
-            libsql::Value::Real(f) => {
+            crate::compat::LibsqlValue::Null => serde_json::Value::Null,
+            crate::compat::LibsqlValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+            crate::compat::LibsqlValue::Real(f) => {
                 if let Some(n) = serde_json::Number::from_f64(*f) {
                     serde_json::Value::Number(n)
                 } else {
                     serde_json::Value::Null
                 }
             }
-            libsql::Value::Text(s) => serde_json::Value::String(s.clone()),
-            libsql::Value::Blob(b) => serde_json::Value::Array(
+            crate::compat::LibsqlValue::Text(s) => serde_json::Value::String(s.clone()),
+            crate::compat::LibsqlValue::Blob(b) => serde_json::Value::Array(
                 b.iter()
                     .map(|&byte| serde_json::Value::Number(serde_json::Number::from(byte)))
                     .collect(),
