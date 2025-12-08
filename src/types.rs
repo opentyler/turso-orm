@@ -204,17 +204,21 @@ impl std::fmt::Display for SortOrder {
 ///
 /// # Examples
 ///
-/// ```rust
-/// use libsql_orm::{Model, Aggregate};
-///
+/// ```no_run
+/// use libsql_orm::{Model, Aggregate, Database};
+/// # use libsql_orm::Result;
+/// # #[derive(libsql_orm::Model, Clone, serde::Serialize, serde::Deserialize)] struct User { id: Option<i64>, name: String }
+/// # async fn example(db: &Database) -> Result<()> {
 /// // Count all users
-/// let count = User::aggregate(Aggregate::Count, "*", None, &db).await?;
+/// let count = User::aggregate(Aggregate::Count, "*", None, db).await?;
 ///
 /// // Average age
-/// let avg_age = User::aggregate(Aggregate::Avg, "age", None, &db).await?;
+/// let avg_age = User::aggregate(Aggregate::Avg, "age", None, db).await?;
 ///
 /// // Maximum salary
-/// let max_salary = User::aggregate(Aggregate::Max, "salary", None, &db).await?;
+/// let max_salary = User::aggregate(Aggregate::Max, "salary", None, db).await?;
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Aggregate {
@@ -277,16 +281,16 @@ impl std::fmt::Display for JoinType {
 /// # Examples
 ///
 /// ```rust
-/// use libsql_orm::{Operator, FilterOperator, Value};
+/// use libsql_orm::{Operator, FilterOperator, Filter, Value};
 ///
 /// // Equal comparison
-/// let filter = FilterOperator::Eq("status".to_string(), Value::Text("active".to_string()));
+/// let filter = FilterOperator::Single(Filter::eq("status", "active"));
 ///
 /// // Greater than
-/// let filter = FilterOperator::Gt("age".to_string(), Value::Integer(18));
+/// let filter = FilterOperator::Single(Filter::gt("age", 18i64));
 ///
 /// // LIKE pattern matching
-/// let filter = FilterOperator::Like("name".to_string(), Value::Text("%john%".to_string()));
+/// let filter = FilterOperator::Single(Filter::like("name", "%john%"));
 /// ```
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Operator {

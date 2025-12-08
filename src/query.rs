@@ -7,32 +7,40 @@
 //! # Basic Usage
 //!
 //! ```rust
-//! use libsql_orm::{QueryBuilder, FilterOperator, Sort, SortOrder};
+//! use libsql_orm::{QueryBuilder, FilterOperator, Filter, Sort, SortOrder, Result};
 //!
+//! # fn example() -> Result<()> {
 //! let query = QueryBuilder::new("users")
 //!     .select(vec!["id", "name", "email"])
-//!     .r#where(FilterOperator::Eq("is_active".to_string(), Value::Boolean(true)))
+//!     .r#where(FilterOperator::Single(Filter::eq("is_active", true)))
 //!     .order_by(Sort::new("name", SortOrder::Asc))
 //!     .limit(10);
 //!
 //! let (sql, params) = query.build()?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # Complex Queries
 //!
-//! ```rust
-//! use libsql_orm::{QueryBuilder, JoinType, FilterOperator, Aggregate};
+//! ```no_run
+//! use libsql_orm::{QueryBuilder, JoinType, FilterOperator, Filter, Aggregate, Sort, Database, Result};
+//! # #[derive(serde::Deserialize)]
+//! # struct OrderWithUser { id: i64, name: String, title: Option<String> }
 //!
+//! # async fn example(db: &Database) -> Result<()> {
 //! let complex_query = QueryBuilder::new("orders")
 //!     .select(vec!["orders.id", "users.name", "products.title"])
 //!     .join(JoinType::Inner, "users", "users.id = orders.user_id")
 //!     .join(JoinType::Inner, "products", "products.id = orders.product_id")
-//!     .r#where(FilterOperator::Gte("orders.created_at".to_string(), Value::Text("2024-01-01".to_string())))
+//!     .r#where(FilterOperator::Single(Filter::ge("orders.created_at", "2024-01-01")))
 //!     .group_by(vec!["users.id"])
 //!     .aggregate(Aggregate::Count, "orders.id", Some("order_count"))
 //!     .order_by(Sort::desc("order_count"));
 //!
-//! let results = complex_query.execute::<OrderWithUser>(&db).await?;
+//! let results = complex_query.execute::<OrderWithUser>(db).await?;
+//! # Ok(())
+//! # }
 //! ```
 
 use crate::filters::FilterValue;
@@ -85,12 +93,13 @@ impl<T> QueryResult<T> {
 /// # Examples
 ///
 /// ```rust
-/// use libsql_orm::{QueryBuilder, FilterOperator, Sort, SortOrder, JoinType};
+/// use libsql_orm::{QueryBuilder, FilterOperator, Filter, Sort, SortOrder, JoinType, Aggregate};
 ///
+/// # fn example() {
 /// // Basic query
 /// let query = QueryBuilder::new("users")
 ///     .select(vec!["id", "name", "email"])
-///     .r#where(FilterOperator::Eq("is_active".to_string(), Value::Boolean(true)))
+///     .r#where(FilterOperator::Single(Filter::eq("is_active", true)))
 ///     .order_by(Sort::new("name", SortOrder::Asc))
 ///     .limit(10);
 ///
@@ -98,13 +107,14 @@ impl<T> QueryResult<T> {
 /// let joined_query = QueryBuilder::new("posts")
 ///     .select(vec!["posts.title", "users.name"])
 ///     .join(JoinType::Inner, "users", "users.id = posts.user_id")
-///     .r#where(FilterOperator::Eq("posts.published".to_string(), Value::Boolean(true)));
+///     .r#where(FilterOperator::Single(Filter::eq("posts.published", true)));
 ///
 /// // Aggregate query
 /// let agg_query = QueryBuilder::new("orders")
 ///     .aggregate(Aggregate::Sum, "amount", Some("total_amount"))
 ///     .group_by(vec!["user_id"])
-///     .having(FilterOperator::Gt("total_amount".to_string(), Value::Real(1000.0)));
+///     .having(FilterOperator::Single(Filter::gt("total_amount", 1000.0)));
+/// # }
 /// ```
 pub struct QueryBuilder {
     table: String,

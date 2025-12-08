@@ -14,7 +14,7 @@
 //! use libsql_orm::Model;
 //! use serde::{Serialize, Deserialize};
 //!
-//! #[derive(Model, Serialize, Deserialize)]
+//! #[derive(Model, Clone, Serialize, Deserialize)]
 //! #[table_name("user_accounts")]  // Custom table name
 //! struct User {
 //!     pub id: Option<i64>,
@@ -205,7 +205,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
         let mut results = Vec::new();
         // Note: Manual transaction handling for WASM
-        db.execute("BEGIN", vec![crate::compat::null_value(); 0])
+        db.execute("BEGIN", vec![])
             .await?;
 
         for model in models {
@@ -233,7 +233,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
             results.push(result);
         }
 
-        db.execute("COMMIT", vec![crate::compat::null_value(); 0])
+        db.execute("COMMIT", vec![])
             .await?;
         Ok(results)
     }
@@ -320,7 +320,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
     /// Count all records
     async fn count(db: &Database) -> Result<u64> {
         let sql = format!("SELECT COUNT(*) FROM {}", Self::table_name());
-        let mut rows = db.query(&sql, vec![crate::compat::null_value(); 0]).await?;
+        let mut rows = db.query(&sql, vec![]).await?;
 
         if let Some(row) = rows.next().await? {
             row.get_value(0)
@@ -401,7 +401,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
         let mut results = Vec::new();
         // Note: Manual transaction handling for WASM
-        db.execute("BEGIN", vec![crate::compat::null_value(); 0])
+        db.execute("BEGIN", vec![])
             .await?;
 
         for model in models {
@@ -409,7 +409,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
             results.push(result);
         }
 
-        db.execute("COMMIT", vec![crate::compat::null_value(); 0])
+        db.execute("COMMIT", vec![])
             .await?;
         Ok(results)
     }

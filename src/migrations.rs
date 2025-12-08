@@ -15,23 +15,25 @@
 //!
 //! # Basic Usage
 //!
-//! ```rust
-//! use libsql_orm::{MigrationManager, MigrationBuilder, generate_migration};
+//! ```no_run
+//! use libsql_orm::{MigrationManager, MigrationBuilder, generate_migration, Database, Error, Model};
+//! # #[derive(libsql_orm::Model, Clone, serde::Serialize, serde::Deserialize)]
+//! # struct User { id: Option<i64>, name: String }
 //!
 //! async fn run_migrations(db: Database) -> Result<(), Error> {
 //!     let manager = MigrationManager::new(db);
 //!     manager.init().await?;
-//!     
+//!
 //!     // Auto-generate from model
 //!     let migration = generate_migration!(User);
 //!     manager.execute_migration(&migration).await?;
-//!     
+//!
 //!     // Manual migration
 //!     let manual_migration = MigrationBuilder::new("add_index")
 //!         .up("CREATE INDEX idx_users_email ON users(email)")
 //!         .down("DROP INDEX idx_users_email")
 //!         .build();
-//!     
+//!
 //!     manager.execute_migration(&manual_migration).await?;
 //!     Ok(())
 //! }
@@ -57,7 +59,7 @@
 //! ```
 
 use crate::{
-    compat::{null_value, text_value},
+    compat::text_value,
     database::Database,
     error::Error,
 };
@@ -95,19 +97,19 @@ pub struct Migration {
 ///
 /// # Examples
 ///
-/// ```rust
-/// use libsql_orm::{MigrationManager, Database};
+/// ```no_run
+/// use libsql_orm::{MigrationManager, Database, Error};
 ///
 /// async fn setup_migrations(db: Database) -> Result<(), Error> {
 ///     let manager = MigrationManager::new(db);
-///     
+///
 ///     // Initialize migration tracking
 ///     manager.init().await?;
-///     
+///
 ///     // Get migration status
 ///     let executed = manager.get_executed_migrations().await?;
 ///     let pending = manager.get_pending_migrations().await?;
-///     
+///
 ///     println!("Executed: {}, Pending: {}", executed.len(), pending.len());
 ///     Ok(())
 /// }
@@ -134,7 +136,7 @@ impl MigrationManager {
             )
         "#;
 
-        let params = vec![null_value(); 0];
+        let params = vec![];
 
         self.db.execute(sql, params).await?;
         Ok(())
@@ -163,7 +165,7 @@ impl MigrationManager {
         {
             let sql =
                 "SELECT id, name, sql, created_at, executed_at FROM migrations ORDER BY created_at";
-            let mut rows = self.db.query(sql, vec![null_value(); 0]).await?;
+            let mut rows = self.db.query(sql, vec![]).await?;
 
             let mut migrations = Vec::new();
             while let Some(row) = rows.next().await? {
@@ -198,11 +200,11 @@ impl MigrationManager {
     /// Execute a migration
     pub async fn execute_migration(&self, migration: &Migration) -> Result<(), Error> {
         // Begin transaction
-        self.db.execute("BEGIN", vec![null_value(); 0]).await?;
+        self.db.execute("BEGIN", vec![]).await?;
 
         // Execute the migration SQL
         self.db
-            .execute(&migration.sql, vec![null_value(); 0])
+            .execute(&migration.sql, vec![])
             .await?;
 
         // Record the migration
@@ -225,7 +227,7 @@ impl MigrationManager {
             .await?;
 
         // Commit transaction
-        self.db.execute("COMMIT", vec![null_value(); 0]).await?;
+        self.db.execute("COMMIT", vec![]).await?;
 
         Ok(())
     }

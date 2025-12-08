@@ -86,26 +86,39 @@
 //!
 //! Smart create-or-update operations for efficient data management:
 //!
-//! ```rust
-//! use libsql_orm::{Model, Database};
+//! ```no_run
+//! use libsql_orm::{Model, Database, Result};
+//! # #[derive(libsql_orm::Model, Clone, serde::Serialize, serde::Deserialize)]
+//! # struct User { id: Option<i64>, name: String, email: String, username: Option<String> }
+//! # async fn example(db: &Database) -> Result<()> {
 //!
 //! // Method 1: create_or_update (based on primary key)
-//! let user = User { id: Some(123), name: "John".to_string(), ... };
-//! let saved = user.create_or_update(&db).await?;  // Updates if ID exists, creates if not
+//! let user = User { id: Some(123), name: "John".to_string(), email: "john@example.com".to_string(), username: None };
+//! let saved = user.create_or_update(db).await?;  // Updates if ID exists, creates if not
 //!
 //! // Method 2: upsert (based on unique constraints)
-//! let user = User { id: None, email: "john@example.com".to_string(), ... };
-//! let saved = user.upsert(&["email"], &db).await?;  // Updates if email exists, creates if not
+//! let user = User { id: None, email: "john@example.com".to_string(), name: "John".to_string(), username: None };
+//! let saved = user.upsert(&["email"], db).await?;  // Updates if email exists, creates if not
 //!
 //! // Multiple unique constraints
-//! let saved = user.upsert(&["email", "username"], &db).await?;
+//! let user = User { id: None, email: "john@example.com".to_string(), name: "John".to_string(), username: Some("john123".to_string()) };
+//! let saved = user.upsert(&["email", "username"], db).await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## 📝 Built-in Logging
 //!
 //! Comprehensive logging for debugging and monitoring:
 //!
-//! ```rust
+//! ```no_run
+//! # use libsql_orm::{Model, Database, Result};
+//! # #[derive(libsql_orm::Model, Clone, serde::Serialize, serde::Deserialize)]
+//! # struct User { id: Option<i64>, name: String, email: String }
+//! # impl User { fn new(name: &str, email: &str) -> Self {
+//! #   Self { id: None, name: name.to_string(), email: email.to_string() }
+//! # }}
+//! # async fn example(db: &Database) -> Result<()> {
 //! // All database operations are automatically logged
 //! // Logs appear in browser console (WASM) or standard logging (native)
 //!
@@ -113,13 +126,15 @@
 //!
 //! // Logs: [INFO] users: Creating record in table: users
 //! // Logs: [DEBUG] users: SQL: INSERT INTO users (...) VALUES (...)
-//! let saved = user.create(&db).await?;
+//! let saved = user.create(db).await?;
 //!
 //! // Logs: [DEBUG] users: Finding record by ID: 123
-//! let found = User::find_by_id(123, &db).await?;
+//! let found = User::find_by_id(123, db).await?;
 //!
 //! // Logs: [INFO] users: Updating record with ID: 123
-//! let updated = found.unwrap().update(&db).await?;
+//! let updated = found.unwrap().update(db).await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## 📚 Advanced Usage
@@ -150,47 +165,57 @@
 //!     pub status: String,
 //! }
 //!
+//! # use libsql_orm::{FilterOperator, Filter, Database, Result};
+//! # async fn example(db: &Database) -> Result<()> {
 //! // Boolean filtering works seamlessly
 //! let active_users = User::find_where(
-//!     FilterOperator::Eq("is_active".to_string(), Value::Boolean(true)),
-//!     &db
+//!     FilterOperator::Single(Filter::eq("is_active", true)),
+//!     db
 //! ).await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### Query Builder
 //!
 //! ```rust
-//! use libsql_orm::{QueryBuilder, FilterOperator, Sort, SortOrder, Pagination};
+//! use libsql_orm::{QueryBuilder, FilterOperator, Filter, Sort, SortOrder, Value, Result};
 //!
+//! # fn example() -> Result<()> {
 //! // Complex query with filtering and pagination
 //! let query = QueryBuilder::new("users")
-//!     .select(&["id", "name", "email"])
-//!     .r#where(FilterOperator::Gte("age".to_string(), Value::Integer(18)))
+//!     .select(vec!["id", "name", "email"])
+//!     .r#where(FilterOperator::Single(Filter::ge("age", 18i64)))
 //!     .order_by(Sort::new("created_at", SortOrder::Desc))
 //!     .limit(10)
 //!     .offset(20);
 //!
 //! let (sql, params) = query.build()?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### Cloudflare Workers Integration
 //!
-//! ```rust
+//! ```ignore
 //! use worker::*;
-//! use libsql_orm::{Model, Database, MigrationManager, generate_migration};
+//! use libsql_orm::{Model, Database};
+//!
+//! # #[derive(libsql_orm::Model, Clone, serde::Serialize, serde::Deserialize)]
+//! # struct User { id: Option<i64>, name: String }
 //!
 //! #[event(fetch)]
 //! async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 //!     let database_url = env.var("TURSO_DATABASE_URL")?.to_string();
 //!     let auth_token = env.var("TURSO_AUTH_TOKEN")?.to_string();
-//!     
+//!
 //!     let db = Database::new_connect(&database_url, &auth_token).await
 //!         .map_err(|e| format!("Database connection failed: {}", e))?;
-//!     
+//!
 //!     // Your application logic here
 //!     let users = User::find_all(&db).await
 //!         .map_err(|e| format!("Query failed: {}", e))?;
-//!         
+//!
 //!     Response::from_json(&users)
 //! }
 //! ```

@@ -7,38 +7,40 @@
 //!
 //! # Offset-based Pagination
 //!
-//! ```rust
-//! use libsql_orm::{Pagination, PaginatedResult, Model};
+//! ```no_run
+//! use libsql_orm::{Pagination, PaginatedResult, Model, Database};
+//! # #[derive(libsql_orm::Model, Clone, serde::Serialize, serde::Deserialize)]
+//! # struct User { id: Option<i64>, name: String }
 //!
 //! async fn paginate_users(db: &Database) -> Result<(), Box<dyn std::error::Error>> {
 //!     let pagination = Pagination::new(1, 10); // Page 1, 10 items per page
 //!     let result: PaginatedResult<User> = User::find_paginated(&pagination, db).await?;
-//!     
+//!
 //!     println!("Page {}/{}", result.pagination.page, result.pagination.total_pages.unwrap_or(0));
 //!     println!("Total items: {}", result.pagination.total.unwrap_or(0));
-//!     
+//!
 //!     for user in result.data {
 //!         println!("User: {}", user.name);
 //!     }
-//!     
+//!
 //!     Ok(())
 //! }
 //! ```
 //!
 //! # Cursor-based Pagination
 //!
-//! ```rust
-//! use libsql_orm::{CursorPagination, CursorPaginatedResult};
+//! ```no_run
+//! use libsql_orm::{CursorPagination, CursorPaginatedResult, Database};
 //!
 //! async fn cursor_paginate(db: &Database) -> Result<(), Box<dyn std::error::Error>> {
 //!     let mut cursor_pagination = CursorPagination::new(10);
-//!     
+//!
 //!     loop {
 //!         // Implement cursor-based pagination logic here
 //!         // This would typically use a timestamp or ID as the cursor
 //!         break;
 //!     }
-//!     
+//!
 //!     Ok(())
 //! }
 //! ```
