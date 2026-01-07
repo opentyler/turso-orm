@@ -1,6 +1,6 @@
 [package]
 name = "libsql-orm"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 authors = ["Ayon Saha <ayonsaha2011@gmail.com>"]
 description = "A powerful, async-first ORM for Turso Database with first-class support for Cloudflare Workers and WebAssembly environments. Features include automatic boolean conversion, upsert operations, built-in logging, migrations, and comprehensive query building."
@@ -65,7 +65,7 @@ worker = ">=0.7.0"
 
 # Use git version of libsql with newer worker dependency
 [patch.crates-io]
-libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudflare"] }
+libsql = { git = "https://github.com/ayonsaha2011/libsql", rev = "fe17aadb6a8a3381caa0a4c542f7c14fd323d6ab", features = ["cloudflare"] }
 
 # Target-specific configurations for libsql
 [target.'cfg(target_arch = "wasm32")'.dependencies]

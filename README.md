@@ -1,4 +1,4 @@
-# libsql-orm
+update # libsql-orm
 
 [![Crates.io](https://img.shields.io/crates/v/libsql-orm.svg)](https://crates.io/crates/libsql-orm)
 [![Documentation](https://docs.rs/libsql-orm/badge.svg)](https://docs.rs/libsql-orm)
@@ -23,6 +23,7 @@ A powerful, async-first ORM for [Turso Database](https://github.com/tursodatabas
 - ✅ **Boolean Type Safety** - Automatic SQLite integer ↔ Rust boolean conversion
 - 🏷️ **Column Attributes** - `#[orm_column(...)]` for column customization
 - 🔄 **Upsert Operations** - Smart create_or_update and upsert methods
+- 🔌 **MCP Support** - Model Context Protocol integration for AI-powered database interactions
 
 ## 🚀 Quick Start
 
@@ -698,6 +699,55 @@ let saved_user = user.upsert(&["email"], &db).await?;
 let saved_user = user.upsert(&["email", "username"], &db).await?;
 ```
 
+## 🔌 MCP (Model Context Protocol) Support
+
+libsql-orm provides comprehensive MCP server integration for AI-powered database interactions. The MCP protocol enables seamless communication between AI assistants and your Turso database.
+
+### MCP Features
+
+- **40+ Tools**: Complete CRUD operations, queries, migrations, and more
+- **Type-Safe Queries**: Automatic validation and type checking
+- **Advanced Filtering**: Complex AND/OR/NOT filter combinations
+- **Pagination Support**: Both offset-based and cursor-based pagination
+- **Migration Management**: Create, execute, and track database migrations
+- **Bulk Operations**: Efficient batch processing
+- **Search Capabilities**: Multi-column text search
+- **Aggregations**: COUNT, SUM, AVG, MIN, MAX operations
+
+### MCP Resources
+
+The MCP server exposes:
+- Database connection resources
+- Model resources (table-based)
+- Query builder resources
+- Migration tracking resources
+
+### Quick MCP Example
+
+```json
+{
+  "tool": "model_find_where",
+  "arguments": {
+    "model": "User",
+    "filter": {
+      "type": "And",
+      "filters": [
+        {
+          "type": "Single",
+          "filter": {"column": "is_active", "operator": "Eq", "value": true}
+        },
+        {
+          "type": "Single",
+          "filter": {"column": "age", "operator": "Gt", "value": 18}
+        }
+      ]
+    }
+  }
+}
+```
+
+📖 **[Complete MCP Documentation](MCP_DOCUMENTATION.md)** - Comprehensive guide with all 40+ tools, examples, and best practices
+
 ## 🏗️ Architecture
 
 ### WASM Compatibility
@@ -754,8 +804,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Rust community for the amazing ecosystem
 
 ---
-**Need help?** 
+**Need help?**
 - 📚 [Documentation](https://docs.rs/libsql-orm)
+- 🔌 [MCP Documentation](MCP_DOCUMENTATION.md)
 - 💬 [Discussions](https://github.com/ayonsaha2011/libsql-orm/discussions)
 - 🐛 [Issues](https://github.com/ayonsaha2011/libsql-orm/issues)
 
