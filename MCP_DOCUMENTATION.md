@@ -4,7 +4,7 @@
 
 `libsql-orm` is a powerful, async-first ORM for Turso Database (libsql) with first-class support for Cloudflare Workers and WebAssembly environments. This MCP (Model Context Protocol) server provides tools and resources for interacting with Turso databases using a type-safe, Rust-based ORM.
 
-**Version**: 0.2.4
+**Version**: 0.2.5
 **License**: MIT
 **Repository**: https://github.com/ayonsaha2011/libsql-orm
 
@@ -20,6 +20,7 @@
 - 🌐 **WASM Compatible** - Optimized for WebAssembly targets
 - 🔄 **Upsert Operations** - Smart create_or_update and upsert methods
 - 📝 **Built-in Logging** - Comprehensive logging for debugging
+- ✅ **Boolean Type Safety** - Robust SQLite INTEGER ↔ Rust bool conversion with flexible deserializer
 
 ## MCP Resources
 
@@ -864,6 +865,37 @@ The ORM supports the following value types:
 - **Blob**: Binary data
 - **Boolean**: Boolean (stored as INTEGER 0/1)
 
+### Boolean Type Handling
+
+SQLite doesn't have a native boolean type, so booleans are stored as INTEGER values (0 for false, 1 for true). The ORM provides a `deserialize_bool` helper function for robust boolean conversion that handles multiple input formats:
+
+**Supported Input Formats**:
+- **Integers**: `0` → `false`, any non-zero → `true`
+- **Floats**: `0.0` → `false`, any non-zero → `true`
+- **Booleans**: Direct pass-through
+- **Strings**:
+  - `true` values: "true", "1", "yes", "on" (case-insensitive)
+  - `false` values: "false", "0", "no", "off" (case-insensitive)
+
+**Usage Example**:
+```rust
+use libsql_orm::{Model, deserialize_bool};
+use serde::{Serialize, Deserialize};
+
+#[derive(Model, Serialize, Deserialize)]
+struct User {
+    pub id: Option<i64>,
+    pub name: String,
+
+    // Apply deserializer for robust boolean handling
+    #[serde(deserialize_with = "deserialize_bool")]
+    pub is_active: bool,
+
+    #[serde(deserialize_with = "deserialize_bool")]
+    pub is_verified: bool,
+}
+```
+
 ### Sort Order
 
 - **Asc**: Ascending order
@@ -1130,7 +1162,7 @@ For deploying with Cloudflare Workers:
 ### Dependencies
 ```toml
 [dependencies]
-libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
+libsql-orm = { version = "0.2.5", features = ["cloudflare"] }
 worker = { version = ">=0.7.0", features = ['http', 'axum'] }
 ```
 
@@ -1184,7 +1216,9 @@ Use bulk operations for multiple inserts/updates to reduce round trips:
 
 2. **Boolean Type**:
    - Stored as INTEGER (0/1) in SQLite
-   - Automatic conversion provided
+   - Automatic conversion provided via `deserialize_bool` helper
+   - Supports flexible deserialization: integers (0/non-zero), floats (0.0/non-zero), strings ("true"/"false"/"1"/"0"/"yes"/"no"/"on"/"off"), and native booleans
+   - Use `#[serde(deserialize_with = "deserialize_bool")]` attribute on boolean fields for robust conversion
 
 3. **Transaction Support**:
    - Manual transaction handling in WASM
@@ -1213,5 +1247,5 @@ For issues, questions, or contributions:
 
 ---
 
-**Last Updated**: 2025-12-29
-**Documentation Version**: 1.0.0
+**Last Updated**: 2026-01-10
+**Documentation Version**: 1.0.1
