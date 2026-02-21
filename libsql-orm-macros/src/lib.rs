@@ -340,7 +340,11 @@ fn parse_column_definition(field: &Field) -> proc_macro2::TokenStream {
                 Ok(())
             });
 
-            let mut column_def = column_type.unwrap_or_else(|| default_def.clone());
+            let mut column_def = if let Some(custom_type) = column_type {
+                format!("{field_name_str} {custom_type}")
+            } else {
+                default_def.clone()
+            };
             if primary_key {
                 column_def = format!("{column_def} PRIMARY KEY");
             }

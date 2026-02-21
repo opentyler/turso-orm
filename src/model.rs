@@ -265,20 +265,20 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
             .r#where(filter)
             .limit(1);
 
-        let results = builder.execute::<Self>(db).await?;
+        let results = builder.execute_model::<Self>(db).await?;
         Ok(results.into_iter().next())
     }
 
     /// Find all records
     async fn find_all(db: &Database) -> Result<Vec<Self>> {
         let builder = QueryBuilder::new(Self::table_name());
-        builder.execute::<Self>(db).await
+        builder.execute_model::<Self>(db).await
     }
 
     /// Find records with a filter
     async fn find_where(filter: FilterOperator, db: &Database) -> Result<Vec<Self>> {
         let builder = QueryBuilder::new(Self::table_name()).r#where(filter);
-        builder.execute::<Self>(db).await
+        builder.execute_model::<Self>(db).await
     }
 
     /// Find records with pagination
@@ -287,7 +287,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         db: &Database,
     ) -> Result<PaginatedResult<Self>> {
         let builder = QueryBuilder::new(Self::table_name());
-        builder.execute_paginated::<Self>(db, pagination).await
+        builder.execute_model_paginated::<Self>(db, pagination).await
     }
 
     /// Find records with filter and pagination
@@ -297,7 +297,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         db: &Database,
     ) -> Result<PaginatedResult<Self>> {
         let builder = QueryBuilder::new(Self::table_name()).r#where(filter);
-        builder.execute_paginated::<Self>(db, pagination).await
+        builder.execute_model_paginated::<Self>(db, pagination).await
     }
 
     /// Search records with text search
@@ -479,7 +479,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         }
 
         let pagination = pagination.unwrap_or(&Pagination::default()).clone();
-        builder.execute_paginated::<Self>(db, &pagination).await
+        builder.execute_model_paginated::<Self>(db, &pagination).await
     }
 
     /// List records with filter, sorting, and pagination
@@ -496,12 +496,12 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         }
 
         let pagination = pagination.unwrap_or(&Pagination::default()).clone();
-        builder.execute_paginated::<Self>(db, &pagination).await
+        builder.execute_model_paginated::<Self>(db, &pagination).await
     }
 
     /// Execute a custom query
     async fn query(builder: QueryBuilder, db: &Database) -> Result<Vec<Self>> {
-        builder.execute::<Self>(db).await
+        builder.execute_model::<Self>(db).await
     }
 
     /// Execute a custom query with pagination
@@ -510,7 +510,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         pagination: &Pagination,
         db: &Database,
     ) -> Result<PaginatedResult<Self>> {
-        builder.execute_paginated::<Self>(db, pagination).await
+        builder.execute_model_paginated::<Self>(db, pagination).await
     }
 
     /// Get aggregate value

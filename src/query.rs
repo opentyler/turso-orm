@@ -663,7 +663,7 @@ impl QueryBuilder {
                         .unwrap_or(crate::compat::LibsqlValue::Null);
                     map.insert(
                         column_name.to_string(),
-                        self.libsql_value_to_json_value(&value),
+                        self.libsql_value_to_json_value_for_column(column_name, &value),
                     );
                 }
                 let json_value = serde_json::to_value(map)?;
@@ -689,7 +689,7 @@ impl QueryBuilder {
                             .unwrap_or(crate::compat::LibsqlValue::Null);
                         map.insert(
                             column_name.to_string(),
-                            self.libsql_value_to_json_value(&value),
+                            self.libsql_value_to_json_value_for_column(column_name, &value),
                         );
                     }
                 }
@@ -700,6 +700,91 @@ impl QueryBuilder {
 
             Ok(results)
         }
+    }
+
+    pub async fn execute_model<T>(&self, db: &Database) -> Result<Vec<T>>
+    where
+        T: crate::Model,
+    {
+        let (sql, params) = self.build()?;
+        #[cfg(feature = "turso")]
+        {
+            let mut stmt = db.inner.prepare(&sql).await?;
+            let columns: Vec<String> = stmt
+                .columns()
+                .iter()
+                .map(|column| column.name().to_string())
+                .collect();
+
+            let mut rows = if params.is_empty() {
+                stmt.query(()).await?
+            } else {
+                stmt.query(params).await?
+            };
+
+            let mut results = Vec::new();
+            while let Some(row) = rows.next().await? {
+                let mut map = HashMap::new();
+                for (i, column_name) in columns.iter().enumerate() {
+                    let value = row
+                        .get_value(i)
+                        .ok()
+                        .unwrap_or(crate::compat::LibsqlValue::Null);
+                    map.insert(
+                        column_name.to_string(),
+                        self.libsql_value_to_model_value(&value),
+                    );
+                }
+                results.push(T::from_map(map)?);
+            }
+
+            Ok(results)
+        }
+
+        #[cfg(not(feature = "turso"))]
+        {
+            let mut rows = db.query(&sql, params).await?;
+
+            let mut results = Vec::new();
+            while let Some(row) = rows.next().await? {
+                let mut map = HashMap::new();
+                for i in 0..row.column_count() {
+                    if let Some(column_name) = row.column_name(i) {
+                        let value = row
+                            .get_value(i)
+                            .ok()
+                            .unwrap_or(crate::compat::LibsqlValue::Null);
+                        map.insert(
+                            column_name.to_string(),
+                            self.libsql_value_to_model_value(&value),
+                        );
+                    }
+                }
+                results.push(T::from_map(map)?);
+            }
+
+            Ok(results)
+        }
+    }
+
+    pub async fn execute_model_paginated<T>(
+        &self,
+        db: &Database,
+        pagination: &Pagination,
+    ) -> Result<PaginatedResult<T>>
+    where
+        T: crate::Model,
+    {
+        let total = self.execute_count(db).await?;
+
+        let data_builder = self
+            .clone()
+            .limit(pagination.limit())
+            .offset(pagination.offset());
+
+        let data = data_builder.execute_model::<T>(db).await?;
+
+        Ok(PaginatedResult::with_total(data, pagination.clone(), total))
     }
 
     /// Execute the query with pagination
@@ -759,6 +844,48 @@ impl QueryBuilder {
                     .map(|&byte| serde_json::Value::Number(serde_json::Number::from(byte)))
                     .collect(),
             ),
+        }
+    }
+
+    fn libsql_value_to_json_value_for_column(
+        &self,
+        column_name: &str,
+        value: &crate::compat::LibsqlValue,
+    ) -> serde_json::Value {
+        match value {
+            crate::compat::LibsqlValue::Integer(i) if self.is_likely_boolean_column(column_name) => {
+                serde_json::Value::Bool(*i != 0)
+            }
+            _ => self.libsql_value_to_json_value(value),
+        }
+    }
+
+    fn is_likely_boolean_column(&self, column_name: &str) -> bool {
+        column_name.starts_with("is_")
+            || column_name.starts_with("has_")
+            || column_name.starts_with("can_")
+            || column_name.starts_with("should_")
+            || column_name.starts_with("was_")
+            || column_name.starts_with("did_")
+            || matches!(
+                column_name,
+                "active"
+                    | "enabled"
+                    | "disabled"
+                    | "verified"
+                    | "deleted"
+                    | "published"
+                    | "archived"
+            )
+    }
+
+    fn libsql_value_to_model_value(&self, value: &crate::compat::LibsqlValue) -> crate::Value {
+        match value {
+            crate::compat::LibsqlValue::Null => crate::Value::Null,
+            crate::compat::LibsqlValue::Integer(i) => crate::Value::Integer(*i),
+            crate::compat::LibsqlValue::Real(f) => crate::Value::Real(*f),
+            crate::compat::LibsqlValue::Text(s) => crate::Value::Text(s.clone()),
+            crate::compat::LibsqlValue::Blob(b) => crate::Value::Blob(b.clone()),
         }
     }
 }
