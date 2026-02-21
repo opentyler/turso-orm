@@ -5,13 +5,13 @@ update # libsql-orm
 [![License](https://img.shields.io/crates/l/libsql-orm.svg)](LICENSE)
 [![Build Status](https://github.com/ayonsaha2011/libsql-orm/workflows/CI/badge.svg)](https://github.com/ayonsaha2011/libsql-orm/actions)
 
-A powerful, async-first ORM for [Turso Database](https://github.com/tursodatabase) with first-class support for **Cloudflare Workers** and WebAssembly environments.
+A powerful, async-first ORM for [Turso Database](https://github.com/tursodatabase) and WebAssembly environments.
 
 > ⚠️ **Disclaimer**: This library is in early development and not fully tested in production environments. Use at your own risk. Please report any issues you encounter and feel free to contribute via pull requests - we're happy to address them and welcome community contributions!
 
 ## ✨ Features
 
-- 🚀 **Cloudflare Workers Ready** - Built specifically for edge computing environments
+- 🚀 **Turso Native Backend** - Uses the `turso` crate directly
 - 🔄 **Async/Await Support** - Fully async API with excellent performance
 - 🎯 **Type-Safe** - Leverages Rust's type system for compile-time safety
 - 📊 **Rich Query Builder** - Fluent API for complex queries
@@ -31,23 +31,12 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
+libsql-orm = { version = "0.2.5", features = ["turso"] }
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-
-# Required for Cloudflare Workers support - use git version of libsql with newer worker dependency
-[patch.crates-io]
-libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudflare"] }
 ```
 
-### Why the Git Patch?
-
-For Cloudflare Workers compatibility, you need to use a patched version of libsql that includes:
-- Updated `worker` dependency compatibility
-- Enhanced WASM support for edge environments
-- Cloudflare-specific optimizations
-
-The patch ensures seamless integration with Cloudflare Workers' runtime environment.
+By default, `libsql-orm` enables `turso_default`, which includes `turso` plus serde/chrono/uuid helpers.
 
 ### Basic Usage
 
@@ -101,18 +90,17 @@ async fn example() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Cloudflare Workers Integration
 
-First, ensure your `Cargo.toml` includes the necessary features and patches:
+Cloudflare support is currently a legacy path and is not available with the `turso` backend.
+Use the `wasm_only` feature for non-database WASM builds, or pin to an older libsql-backed release if you need Cloudflare database connectivity today.
+
+First, ensure your `Cargo.toml` includes the current features:
 
 ```toml
 [dependencies]
-libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
+libsql-orm = { version = "0.2.5", features = ["turso"] }
 worker = ">=0.7.0"
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-
-# Use git version of libsql with newer worker dependency
-[patch.crates-io]
-libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudflare"] }
 ```
 
 Then in your worker code:
@@ -190,15 +178,11 @@ worker = { version = "0.7", features = ['http', 'axum'] }
 worker-macros = { version = "0.7", features = ['http'] }
 axum = { version = "0.8", default-features = false, features = ["json", "macros"] }
 tower-service = "0.3.3"
-libsql-orm = { version = "0.2.4", features = ["cloudflare"] }
+libsql-orm = { version = "0.2.5", features = ["turso"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 console_error_panic_hook = "0.1"
-
-# Use git version of libsql with newer worker dependency
-[patch.crates-io]
-libsql = { git = "https://github.com/ayonsaha2011/libsql", features = ["cloudflare"] }
 ```
 
 ```rust
@@ -754,10 +738,10 @@ The MCP server exposes:
 
 libsql-orm is built from the ground up for WebAssembly environments:
 
-- Uses `libsql` WASM bindings for database connectivity
+- Uses `turso` for database connectivity on supported targets
 - Optimized async runtime for edge computing
 - Minimal binary size with selective feature compilation
-- Compatible with Cloudflare Workers, Deno Deploy, and other edge platforms
+- Compatible with Deno Deploy and other edge platforms (Cloudflare DB support is legacy-only)
 
 
 ## 🔗 Ecosystem
@@ -809,4 +793,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 🔌 [MCP Documentation](MCP_DOCUMENTATION.md)
 - 💬 [Discussions](https://github.com/ayonsaha2011/libsql-orm/discussions)
 - 🐛 [Issues](https://github.com/ayonsaha2011/libsql-orm/issues)
-
