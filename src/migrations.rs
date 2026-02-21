@@ -151,13 +151,13 @@ impl MigrationManager {
 
     /// Get all migrations from the database
     pub async fn get_migrations(&self) -> Result<Vec<Migration>, Error> {
-        #[cfg(not(feature = "libsql"))]
+        #[cfg(not(feature = "turso"))]
         {
             // Return empty migrations for WASM-only builds
             return Ok(vec![]);
         }
 
-        #[cfg(feature = "libsql")]
+        #[cfg(feature = "turso")]
         {
             let sql =
                 "SELECT id, name, sql, created_at, executed_at FROM migrations ORDER BY created_at";

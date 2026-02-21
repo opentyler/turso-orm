@@ -1,19 +1,7 @@
-//! Compatibility layer for handling different database backends
-//!
-//! This module provides type aliases and compatibility functions
-//! for working with both libsql and WASM-only environments.
+#[cfg(feature = "turso")]
+pub use turso::{Error as LibsqlError, Row as LibsqlRow, Rows as LibsqlRows, Value as LibsqlValue};
 
-#[cfg(all(feature = "libsql", target_arch = "wasm32"))]
-pub use libsql::wasm::Rows as LibsqlRows;
-#[cfg(all(feature = "libsql", target_arch = "wasm32"))]
-pub use libsql::{Error as LibsqlError, Row as LibsqlRow, Value as LibsqlValue};
-
-#[cfg(all(feature = "libsql", not(target_arch = "wasm32")))]
-pub use libsql::{
-    Error as LibsqlError, Row as LibsqlRow, Rows as LibsqlRows, Value as LibsqlValue,
-};
-
-#[cfg(not(feature = "libsql"))]
+#[cfg(not(feature = "turso"))]
 #[derive(Debug, Clone, PartialEq)]
 pub enum LibsqlValue {
     Null,
@@ -23,12 +11,13 @@ pub enum LibsqlValue {
     Blob(Vec<u8>),
 }
 
-#[cfg(not(feature = "libsql"))]
+#[cfg(not(feature = "turso"))]
+#[derive(Clone)]
 pub struct LibsqlRow {
     data: std::collections::HashMap<String, LibsqlValue>,
 }
 
-#[cfg(not(feature = "libsql"))]
+#[cfg(not(feature = "turso"))]
 impl LibsqlRow {
     pub fn new() -> Self {
         Self {
@@ -44,9 +33,8 @@ impl LibsqlRow {
         ))
     }
 
-    pub fn get_value(&self, index: usize) -> Option<LibsqlValue> {
-        // Stub implementation
-        Some(LibsqlValue::Null)
+    pub fn get_value(&self, _index: usize) -> Result<LibsqlValue, crate::error::Error> {
+        Ok(LibsqlValue::Null)
     }
 
     pub fn column_count(&self) -> usize {
@@ -60,76 +48,76 @@ impl LibsqlRow {
     }
 }
 
-#[cfg(not(feature = "libsql"))]
+#[cfg(not(feature = "turso"))]
 pub struct LibsqlRows {
     rows: Vec<LibsqlRow>,
-    index: std::cell::Cell<usize>,
+    index: usize,
 }
 
-#[cfg(not(feature = "libsql"))]
+#[cfg(not(feature = "turso"))]
 impl LibsqlRows {
     pub fn new(rows: Vec<LibsqlRow>) -> Self {
         Self {
             rows,
-            index: std::cell::Cell::new(0),
+            index: 0,
         }
     }
 
-    pub async fn next(&self) -> Result<Option<&LibsqlRow>, crate::error::Error> {
-        let current_index = self.index.get();
-        if current_index < self.rows.len() {
-            self.index.set(current_index + 1);
-            Ok(self.rows.get(current_index))
+    pub async fn next(&mut self) -> Result<Option<LibsqlRow>, crate::error::Error> {
+        if self.index < self.rows.len() {
+            let row = self.rows[self.index].clone();
+            self.index += 1;
+            Ok(Some(row))
         } else {
             Ok(None)
         }
     }
 }
 
-#[cfg(not(feature = "libsql"))]
+#[cfg(not(feature = "turso"))]
 pub type LibsqlError = crate::error::Error;
 
 /// Create a null value compatible with both backends
 pub fn null_value() -> LibsqlValue {
-    #[cfg(feature = "libsql")]
-    return libsql::Value::Null;
+    #[cfg(feature = "turso")]
+    return turso::Value::Null;
 
-    #[cfg(not(feature = "libsql"))]
+    #[cfg(not(feature = "turso"))]
     return LibsqlValue::Null;
 }
 
 /// Create a text value compatible with both backends
 pub fn text_value(s: String) -> LibsqlValue {
-    #[cfg(feature = "libsql")]
-    return libsql::Value::Text(s);
+    #[cfg(feature = "turso")]
+    return turso::Value::Text(s);
 
-    #[cfg(not(feature = "libsql"))]
+    #[cfg(not(feature = "turso"))]
     return LibsqlValue::Text(s);
 }
 
 /// Create an integer value compatible with both backends
 pub fn integer_value(i: i64) -> LibsqlValue {
-    #[cfg(feature = "libsql")]
-    return libsql::Value::Integer(i);
+    #[cfg(feature = "turso")]
+    return turso::Value::Integer(i);
 
-    #[cfg(not(feature = "libsql"))]
+    #[cfg(not(feature = "turso"))]
     return LibsqlValue::Integer(i);
 }
 
 /// Create a real/float value compatible with both backends
 pub fn real_value(f: f64) -> LibsqlValue {
-    #[cfg(feature = "libsql")]
-    return libsql::Value::Real(f);
+    #[cfg(feature = "turso")]
+    return turso::Value::Real(f);
 
-    #[cfg(not(feature = "libsql"))]
+    #[cfg(not(feature = "turso"))]
     return LibsqlValue::Real(f);
 }
 
 /// Create a blob value compatible with both backends
 pub fn blob_value(b: Vec<u8>) -> LibsqlValue {
-    #[cfg(feature = "libsql")]
-    return libsql::Value::Blob(b);
+    #[cfg(feature = "turso")]
+    return turso::Value::Blob(b);
 
-    #[cfg(not(feature = "libsql"))]
+    #[cfg(not(feature = "turso"))]
     return LibsqlValue::Blob(b);
 }

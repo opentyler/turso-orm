@@ -247,10 +247,7 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
         Self::log_debug(&format!("Finding record by ID: {}", mask_id(id)));
         Self::log_debug(&format!("SQL: {sql}"));
 
-        let mut rows = db
-            .inner
-            .query(&sql, vec![crate::compat::integer_value(id)])
-            .await?;
+        let mut rows = db.query(&sql, vec![crate::compat::integer_value(id)]).await?;
 
         if let Some(row) = rows.next().await? {
             let map = Self::row_to_map(&row)?;
@@ -551,12 +548,17 @@ pub trait Model: Serialize + DeserializeOwned + Send + Sync + Clone {
 
     /// Convert a database row to a HashMap
     fn row_to_map(row: &crate::compat::LibsqlRow) -> Result<HashMap<String, crate::Value>> {
+        let columns = Self::columns();
         let mut map = HashMap::new();
-        for i in 0..row.column_count() {
-            if let Some(column_name) = row.column_name(i) {
-                let value = row.get_value(i).unwrap_or(crate::compat::null_value());
-                map.insert(column_name.to_string(), Self::libsql_value_to_value(&value));
+        for (i, &col_name) in columns.iter().enumerate() {
+            if i >= row.column_count() {
+                break;
             }
+            let value = row
+                .get_value(i)
+                .ok()
+                .unwrap_or(crate::compat::null_value());
+            map.insert(col_name.to_string(), Self::libsql_value_to_value(&value));
         }
         Ok(map)
     }

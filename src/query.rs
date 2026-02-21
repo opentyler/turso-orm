@@ -639,26 +639,67 @@ impl QueryBuilder {
         T: serde::de::DeserializeOwned,
     {
         let (sql, params) = self.build()?;
-        let mut rows = db.query(&sql, params).await?;
+        #[cfg(feature = "turso")]
+        {
+            let mut stmt = db.inner.prepare(&sql).await?;
+            let columns: Vec<String> = stmt
+                .columns()
+                .iter()
+                .map(|column| column.name().to_string())
+                .collect();
 
-        let mut results = Vec::new();
-        while let Some(row) = rows.next().await? {
-            let mut map = HashMap::new();
-            for i in 0..row.column_count() {
-                if let Some(column_name) = row.column_name(i) {
-                    let value = row.get_value(i).unwrap_or(crate::compat::LibsqlValue::Null);
+            let mut rows = if params.is_empty() {
+                stmt.query(()).await?
+            } else {
+                stmt.query(params).await?
+            };
+            let mut results = Vec::new();
+            while let Some(row) = rows.next().await? {
+                let mut map = HashMap::new();
+                for (i, column_name) in columns.iter().enumerate() {
+                    let value = row
+                        .get_value(i)
+                        .ok()
+                        .unwrap_or(crate::compat::LibsqlValue::Null);
                     map.insert(
                         column_name.to_string(),
                         self.libsql_value_to_json_value(&value),
                     );
                 }
+                let json_value = serde_json::to_value(map)?;
+                let result: T = serde_json::from_value(json_value)?;
+                results.push(result);
             }
-            let json_value = serde_json::to_value(map)?;
-            let result: T = serde_json::from_value(json_value)?;
-            results.push(result);
+
+            Ok(results)
         }
 
-        Ok(results)
+        #[cfg(not(feature = "turso"))]
+        {
+            let mut rows = db.query(&sql, params).await?;
+
+            let mut results = Vec::new();
+            while let Some(row) = rows.next().await? {
+                let mut map = HashMap::new();
+                for i in 0..row.column_count() {
+                    if let Some(column_name) = row.column_name(i) {
+                        let value = row
+                            .get_value(i)
+                            .ok()
+                            .unwrap_or(crate::compat::LibsqlValue::Null);
+                        map.insert(
+                            column_name.to_string(),
+                            self.libsql_value_to_json_value(&value),
+                        );
+                    }
+                }
+                let json_value = serde_json::to_value(map)?;
+                let result: T = serde_json::from_value(json_value)?;
+                results.push(result);
+            }
+
+            Ok(results)
+        }
     }
 
     /// Execute the query with pagination
